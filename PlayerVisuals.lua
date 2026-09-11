@@ -143,6 +143,10 @@ local originalClothing = {}
 local originalSurfaceAppearances = {}
 local originalAvatarItems = {}
 
+local cloneOriginalPartData = {}
+local cloneOriginalTextures = {}
+local cloneOriginalClothing = {}
+
 local activeRigClone = nil
 local syncConnection = nil
 local steppedConnection = nil
@@ -418,6 +422,10 @@ function PlayerVisuals:ResetRig()
 	end
 	table.clear(cloneAnimTracks)
 
+	table.clear(cloneOriginalClothing)
+	table.clear(cloneOriginalPartData)
+	table.clear(cloneOriginalTextures)
+
 	if activeRigClone then
 		activeRigClone:Destroy()
 		activeRigClone = nil
@@ -449,11 +457,13 @@ function PlayerVisuals:ApplyRig(rigType)
 		if self.RigAnimationConfig.AnimationPack ~= "None" then
 			self:ApplyAnimationPack(self.RigAnimationConfig.AnimationPack)
 		end
+		if self.MaterialConfig.MaterialChanger then
+			self:ApplyMaterial()
+		end
 		return
 	end
 
 	if rigType == "R6" then
-		-- Создание заводского R6 макета без багов геометрии суставов.
 		local cleanDesc = Instance.new("HumanoidDescription")
 		local clone = playersService:CreateHumanoidModelFromDescription(cleanDesc, Enum.HumanoidRigType.R6)
 		clone.Name = "VisualR6_Clone"
@@ -482,7 +492,6 @@ function PlayerVisuals:ApplyRig(rigType)
 
 		cloneRoot.Anchored = true
 
-		-- Синхронизация цветов и скина.
 		local colors = char:FindFirstChildOfClass("BodyColors")
 		if colors then
 			colors:Clone().Parent = clone
@@ -510,7 +519,6 @@ function PlayerVisuals:ApplyRig(rigType)
 			end
 		end
 
-		-- Изоляция физических коллизий.
 		for _, clonePart in ipairs(clone:GetDescendants()) do
 			if clonePart:IsA("BasePart") then
 				clonePart.CanCollide = false
@@ -551,7 +559,6 @@ function PlayerVisuals:ApplyRig(rigType)
 		cloneAnimTracks.walk = loadAnim(walkId)
 		cloneAnimTracks.jump = loadAnim(jumpId)
 
-		-- Принудительное подавление коллизий перед каждым шагом физики мира.
 		steppedConnection = runService.Stepped:Connect(function()
 			if not (activeRigClone and activeRigClone.Parent) then return end
 			for _, p in ipairs(activeRigClone:GetDescendants()) do
@@ -602,6 +609,10 @@ function PlayerVisuals:ApplyRig(rigType)
 				end
 			end
 		end)
+
+		if self.MaterialConfig.MaterialChanger then
+			self:ApplyMaterial()
+		end
 	end
 end
 
@@ -702,96 +713,111 @@ function PlayerVisuals:ApplyAvatar(userId)
 end
 
 function PlayerVisuals:ApplyMaterial()
-	local char = localPlayer.Character
-	if not char then return end
+	local targets = {}
+	if localPlayer.Character then
+		table.insert(targets, {model = localPlayer.Character, isClone = false})
+	end
+	if activeRigClone and activeRigClone.Parent then
+		table.insert(targets, {model = activeRigClone, isClone = true})
+	end
 
 	local mat = Enum.Material[self.MaterialConfig.SelectedMaterial] or Enum.Material.Neon
 
-	if self.MaterialConfig.MaterialChanger then
-		for _, item in ipairs(char:GetChildren()) do
-			if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
-				if not originalClothing[item] then
-					originalClothing[item] = item.Parent
-				end
-				item.Parent = nil
-			end
-		end
+	for _, info in ipairs(targets) do
+		local target = info.model
+		local isClone = info.isClone
 
-		for _, obj in ipairs(char:GetDescendants()) do
-			if obj:IsA("BasePart") and obj.Name == "HumanoidRootPart" then
-				continue
-			end
+		local clothingStore = isClone and cloneOriginalClothing or originalClothing
+		local partStore = isClone and cloneOriginalPartData or originalPartData
+		local textureStore = isClone and cloneOriginalTextures or originalTextures
+		local saStore = isClone and {} or originalSurfaceAppearances
 
-			if obj:IsA("SurfaceAppearance") then
-				if not originalSurfaceAppearances[obj] then
-					originalSurfaceAppearances[obj] = obj.Parent
-				end
-				obj.Parent = nil
-			elseif obj:IsA("BasePart") then
-				if not originalPartData[obj] then
-					originalPartData[obj] = {
-						Material = obj.Material,
-						Color = obj.Color,
-						Transparency = obj.Transparency
-					}
-				end
-
-				if obj:IsA("MeshPart") then
-					if originalTextures[obj] == nil then
-						originalTextures[obj] = obj.TextureID
+		if self.MaterialConfig.MaterialChanger then
+			for _, item in ipairs(target:GetChildren()) do
+				if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
+					if not clothingStore[item] then
+						clothingStore[item] = item.Parent
 					end
-					obj.TextureID = ""
+					item.Parent = nil
+				end
+			end
+
+			for _, obj in ipairs(target:GetDescendants()) do
+				if obj:IsA("BasePart") and obj.Name == "HumanoidRootPart" then
+					continue
 				end
 
-				local specialMesh = obj:FindFirstChildOfClass("SpecialMesh")
-				if specialMesh then
-					if originalTextures[specialMesh] == nil then
-						originalTextures[specialMesh] = specialMesh.TextureId
+				if obj:IsA("SurfaceAppearance") then
+					if not saStore[obj] then
+						saStore[obj] = obj.Parent
 					end
-					specialMesh.TextureId = ""
+					obj.Parent = nil
+				elseif obj:IsA("BasePart") then
+					if not partStore[obj] then
+						partStore[obj] = {
+							Material = obj.Material,
+							Color = obj.Color,
+							Transparency = obj.Transparency
+						}
+					end
+
+					if obj:IsA("MeshPart") then
+						if textureStore[obj] == nil then
+							textureStore[obj] = obj.TextureID
+						end
+						obj.TextureID = ""
+					end
+
+					local specialMesh = obj:FindFirstChildOfClass("SpecialMesh")
+					if specialMesh then
+						if textureStore[specialMesh] == nil then
+							textureStore[specialMesh] = specialMesh.TextureId
+						end
+						specialMesh.TextureId = ""
+					end
+
+					obj.Material = mat
+					obj.Transparency = self.MaterialConfig.MaterialTransparency
+					if self.MaterialConfig.CustomMaterialColor then
+						obj.Color = self.MaterialConfig.MaterialColor
+					end
 				end
-
-				obj.Material = mat
-				obj.Transparency = self.MaterialConfig.MaterialTransparency
-				if self.MaterialConfig.CustomMaterialColor then
-					obj.Color = self.MaterialConfig.MaterialColor
+			end
+		else
+			for item, parent in pairs(clothingStore) do
+				if item and parent then
+					item.Parent = parent
 				end
 			end
-		end
-	else
-		for item, parent in pairs(originalClothing) do
-			if item and parent then
-				item.Parent = parent
-			end
-		end
-		table.clear(originalClothing)
+			table.clear(clothingStore)
 
-		for sa, parent in pairs(originalSurfaceAppearances) do
-			if sa and parent then
-				sa.Parent = parent
-			end
-		end
-		table.clear(originalSurfaceAppearances)
-
-		for target, texture in pairs(originalTextures) do
-			if target and target.Parent then
-				if target:IsA("MeshPart") then
-					target.TextureID = texture
-				elseif target:IsA("SpecialMesh") then
-					target.TextureId = texture
+			for sa, parent in pairs(saStore) do
+				if sa and parent then
+					sa.Parent = parent
 				end
 			end
-		end
-		table.clear(originalTextures)
+			table.clear(saStore)
 
-		for part, data in pairs(originalPartData) do
-			if part and part.Parent and part:IsA("BasePart") then
-				part.Material = data.Material
-				part.Color = data.Color
-				part.Transparency = data.Transparency
+			for tObj, texture in pairs(textureStore) do
+				if tObj and tObj.Parent then
+					if tObj:IsA("MeshPart") then
+						tObj.TextureID = texture
+					elseif tObj:IsA("SpecialMesh") then
+						tObj.TextureId = texture
+					end
+				end
 			end
+			table.clear(textureStore)
+
+			for part, data in pairs(partStore) do
+				if part and part.Parent and part:IsA("BasePart") then
+					part.Material = data.Material
+					part.Color = data.Color
+					part.Transparency = data.Transparency
+				end
+			end
+			table.clear(partStore)
 		end
-		table.clear(originalPartData)
 	end
 end
 
