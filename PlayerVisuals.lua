@@ -173,6 +173,66 @@ local function isOptionSelected(values, option)
 	return false
 end
 
+-- Ручное прикрепление и сварка аксессуара к частям персонажа.
+local function attachAccessory(character, accessory)
+	local handle = accessory:FindFirstChild("Handle")
+	if not (handle and handle:IsA("BasePart")) then
+		accessory.Parent = character
+		return
+	end
+
+	handle.Anchored = false
+	handle.CanCollide = false
+	handle.Massless = true
+
+	for _, weld in ipairs(handle:GetDescendants()) do
+		if weld:IsA("JointInstance") or weld:IsA("WeldConstraint") then
+			weld:Destroy()
+		end
+	end
+
+	local handleAttachment = handle:FindFirstChildOfClass("Attachment")
+	local targetPart, targetAttachment = nil, nil
+
+	if handleAttachment then
+		for _, part in ipairs(character:GetChildren()) do
+			if part:IsA("BasePart") then
+				local att = part:FindFirstChild(handleAttachment.Name)
+				if att and att:IsA("Attachment") then
+					targetAttachment = att
+					targetPart = part
+					break
+				end
+			end
+		end
+	end
+
+	if not targetPart then
+		targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+	end
+
+	if targetPart then
+		local weld = Instance.new("Weld")
+		weld.Name = "AccessoryWeld"
+		weld.Part0 = handle
+		weld.Part1 = targetPart
+
+		if targetAttachment and handleAttachment then
+			weld.C0 = handleAttachment.CFrame
+			weld.C1 = targetAttachment.CFrame
+			handle.CFrame = targetPart.CFrame * targetAttachment.CFrame * handleAttachment.CFrame:Inverse()
+		else
+			weld.C0 = CFrame.new()
+			weld.C1 = CFrame.new()
+			handle.CFrame = targetPart.CFrame
+		end
+
+		weld.Parent = handle
+	end
+
+	accessory.Parent = character
+end
+
 local function backupDefaultAvatar(char)
 	table.clear(originalAvatarItems)
 	for _, item in ipairs(char:GetChildren()) do
@@ -207,11 +267,10 @@ function PlayerVisuals:ResetAvatar()
 		end
 	end
 
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	for _, item in ipairs(originalAvatarItems) do
 		local copy = item:Clone()
-		if copy:IsA("Accessory") and humanoid then
-			humanoid:AddAccessory(copy)
+		if copy:IsA("Accessory") then
+			attachAccessory(char, copy)
 		elseif copy:IsA("Decal") and head then
 			copy.Parent = head
 		else
@@ -265,15 +324,9 @@ function PlayerVisuals:ApplyAvatar(userId)
 		end
 	end
 
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	for _, item in ipairs(targetModel:GetChildren()) do
 		if item:IsA("Accessory") then
-			local acc = item:Clone()
-			if humanoid then
-				humanoid:AddAccessory(acc)
-			else
-				acc.Parent = char
-			end
+			attachAccessory(char, item:Clone())
 		end
 	end
 
