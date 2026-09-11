@@ -302,7 +302,7 @@ local function attachAccessory(character, accessory)
 	end
 
 	if not targetPart then
-		targetPart = character:FindFirstChild("Head") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
+		targetPart = character:FindFirstChild("Head") or character:FindFirstChild("Torso")
 	end
 
 	if targetPart then
@@ -314,14 +314,13 @@ local function attachAccessory(character, accessory)
 		if targetAttachment and handleAttachment then
 			weld.C0 = handleAttachment.CFrame
 			weld.C1 = targetAttachment.CFrame
-			handle.CFrame = targetPart.CFrame * targetAttachment.CFrame * handleAttachment.CFrame:Inverse()
 		else
 			weld.C0 = CFrame.new()
-			weld.C1 = CFrame.new()
-			handle.CFrame = targetPart.CFrame
+			weld.C1 = CFrame.new(0, 0.5, 0)
 		end
 
 		weld.Parent = handle
+		handle.CFrame = targetPart.CFrame * weld.C1 * weld.C0:Inverse()
 	end
 
 	accessory.Parent = character
@@ -340,7 +339,7 @@ local function stopAllTracks(humanoid)
 	end
 end
 
--- Создание легковесного визуального R6 макета без физического гуманоида.
+-- Создание легковесного R6 макета со всеми стандартными точками крепления.
 local function buildVisualR6()
 	local model = Instance.new("Model")
 	model.Name = "VisualR6_Clone"
@@ -383,27 +382,51 @@ local function buildVisualR6()
 		m.Parent = parent
 	end
 
-	makeMotor("RootJoint", root, torso, CFrame.Angles(-math.pi/2, 0, math.pi), CFrame.Angles(-math.pi/2, 0, math.pi), root)
+	makeMotor("RootJoint", root, torso, CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0), CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0), root)
 	makeMotor("Neck", torso, head, CFrame.new(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0), CFrame.new(0, -0.5, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0), torso)
 	makeMotor("Right Shoulder", torso, rightArm, CFrame.new(1, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0), CFrame.new(-0.5, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0), torso)
 	makeMotor("Left Shoulder", torso, leftArm, CFrame.new(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0), CFrame.new(0.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0), torso)
 	makeMotor("Right Hip", torso, rightLeg, CFrame.new(1, -1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0), CFrame.new(0.5, 1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0), torso)
 	makeMotor("Left Hip", torso, leftLeg, CFrame.new(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0), CFrame.new(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0), torso)
 
-	-- Стандартные R6 аттачменты для аксессуаров.
 	local function makeAtt(name, cf, parent)
 		local a = Instance.new("Attachment")
 		a.Name = name
 		a.CFrame = cf
 		a.Parent = parent
 	end
+
+	-- Точки крепления головы.
 	makeAtt("FaceCenterAttachment", CFrame.new(0, 0, 0), head)
 	makeAtt("FaceFrontAttachment", CFrame.new(0, 0, -0.6), head)
 	makeAtt("HairAttachment", CFrame.new(0, 0.6, 0), head)
 	makeAtt("HatAttachment", CFrame.new(0, 0.6, 0), head)
 
-	local animCtrl = Instance.new("AnimationController", model)
-	Instance.new("Animator", animCtrl)
+	-- Точки крепления торса.
+	makeAtt("NeckAttachment", CFrame.new(0, 1, 0), torso)
+	makeAtt("BodyFrontAttachment", CFrame.new(0, 0, -0.5), torso)
+	makeAtt("BodyBackAttachment", CFrame.new(0, 0, 0.5), torso)
+	makeAtt("WaistCenterAttachment", CFrame.new(0, -1, 0), torso)
+	makeAtt("WaistFrontAttachment", CFrame.new(0, -1, -0.5), torso)
+	makeAtt("WaistBackAttachment", CFrame.new(0, -1, 0.5), torso)
+	makeAtt("LeftCollarAttachment", CFrame.new(-1, 1, 0), torso)
+	makeAtt("RightCollarAttachment", CFrame.new(1, 1, 0), torso)
+
+	-- Точки крепления рук и ног.
+	makeAtt("LeftShoulderAttachment", CFrame.new(0, 1, 0), leftArm)
+	makeAtt("LeftGripAttachment", CFrame.new(0, -1, 0), leftArm)
+	makeAtt("RightShoulderAttachment", CFrame.new(0, 1, 0), rightArm)
+	makeAtt("RightGripAttachment", CFrame.new(0, -1, 0), rightArm)
+	makeAtt("LeftFootAttachment", CFrame.new(0, -1, 0), leftLeg)
+	makeAtt("RightFootAttachment", CFrame.new(0, -1, 0), rightLeg)
+
+	-- Нефизический гуманоид для рендеринга текстур одежды и кожи.
+	local cloneHum = Instance.new("Humanoid", model)
+	cloneHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	cloneHum.RequiresNeck = false
+	cloneHum.PlatformStand = true
+	cloneHum.EvaluateStateMachine = false
+	Instance.new("Animator", cloneHum)
 
 	model.PrimaryPart = root
 	return model
@@ -518,12 +541,28 @@ function PlayerVisuals:ApplyRig(rigType)
 	if rigType == "R6" then
 		local clone = buildVisualR6()
 
-		-- Копирование внешности с настоящего персонажа на R6 клон.
+		-- Синхронизация цветов частей тела.
 		local colors = char:FindFirstChildOfClass("BodyColors")
 		if colors then
+			clone.Head.Color = colors.HeadColor3
+			clone.Torso.Color = colors.TorsoColor3
+			clone["Left Arm"].Color = colors.LeftArmColor3
+			clone["Right Arm"].Color = colors.RightArmColor3
+			clone["Left Leg"].Color = colors.LeftLegColor3
+			clone["Right Leg"].Color = colors.RightLegColor3
 			colors:Clone().Parent = clone
+		else
+			local rHead = char:FindFirstChild("Head")
+			if rHead then
+				for _, partName in ipairs({"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}) do
+					if clone:FindFirstChild(partName) then
+						clone[partName].Color = rHead.Color
+					end
+				end
+			end
 		end
 
+		-- Перенос одежды и аксессуаров.
 		for _, item in ipairs(char:GetChildren()) do
 			if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
 				item:Clone().Parent = clone
@@ -544,8 +583,8 @@ function PlayerVisuals:ApplyRig(rigType)
 		clone.Parent = workspace
 		activeRigClone = clone
 
-		local animCtrl = clone:FindFirstChildOfClass("AnimationController")
-		local animator = animCtrl and animCtrl:FindFirstChildOfClass("Animator")
+		local cloneHum = clone:FindFirstChildOfClass("Humanoid")
+		local animator = cloneHum and cloneHum:FindFirstChildOfClass("Animator")
 
 		if animator then
 			local selPack = ANIMATION_PACKS[self.RigAnimationConfig.AnimationPack]
@@ -635,6 +674,10 @@ function PlayerVisuals:ResetAvatar()
 		else
 			copy.Parent = char
 		end
+	end
+
+	if self.RigAnimationConfig.RigType ~= "Default" then
+		self:ApplyRig(self.RigAnimationConfig.RigType)
 	end
 end
 
