@@ -43,10 +43,16 @@ PlayerVisuals.MaterialConfig = {
 	MaterialTransparency = 0
 }
 
+PlayerVisuals.AvatarConfig = {
+	Enabled = false,
+	TargetUserId = 0
+}
+
 local originalPartData = {}
 local originalTextures = {}
 local originalClothing = {}
 local originalSurfaceAppearances = {}
+local originalAvatarItems = {}
 
 local function mapCharacterParts(character)
 	local parts = {}
@@ -165,6 +171,117 @@ local function isOptionSelected(values, option)
 		end
 	end
 	return false
+end
+
+local function backupDefaultAvatar(char)
+	table.clear(originalAvatarItems)
+	for _, item in ipairs(char:GetChildren()) do
+		if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+			table.insert(originalAvatarItems, item:Clone())
+		end
+	end
+	local head = char:FindFirstChild("Head")
+	if head then
+		local face = head:FindFirstChildOfClass("Decal")
+		if face then
+			table.insert(originalAvatarItems, face:Clone())
+		end
+	end
+end
+
+function PlayerVisuals:ResetAvatar()
+	local char = localPlayer.Character
+	if not char then return end
+
+	for _, item in ipairs(char:GetChildren()) do
+		if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+			item:Destroy()
+		end
+	end
+
+	local head = char:FindFirstChild("Head")
+	if head then
+		local currentFace = head:FindFirstChildOfClass("Decal")
+		if currentFace then
+			currentFace:Destroy()
+		end
+	end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	for _, item in ipairs(originalAvatarItems) do
+		local copy = item:Clone()
+		if copy:IsA("Accessory") and humanoid then
+			humanoid:AddAccessory(copy)
+		elseif copy:IsA("Decal") and head then
+			copy.Parent = head
+		else
+			copy.Parent = char
+		end
+	end
+end
+
+function PlayerVisuals:ApplyAvatar(userId)
+	local char = localPlayer.Character
+	if not char or not tonumber(userId) then return end
+	local targetId = tonumber(userId)
+
+	local targetModel
+	local ok = pcall(function()
+		targetModel = playersService:CreateHumanoidModelFromUserId(targetId)
+	end)
+
+	if not (ok and targetModel) then
+		return
+	end
+
+	for _, item in ipairs(char:GetChildren()) do
+		if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+			item:Destroy()
+		end
+	end
+
+	local targetColors = targetModel:FindFirstChildOfClass("BodyColors")
+	if targetColors then
+		targetColors:Clone().Parent = char
+	end
+
+	for _, item in ipairs(targetModel:GetChildren()) do
+		if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
+			item:Clone().Parent = char
+		end
+	end
+
+	local targetHead = targetModel:FindFirstChild("Head")
+	local charHead = char:FindFirstChild("Head")
+	if targetHead and charHead then
+		local currentFace = charHead:FindFirstChildOfClass("Decal")
+		if currentFace then
+			currentFace:Destroy()
+		end
+
+		local targetFace = targetHead:FindFirstChildOfClass("Decal")
+		if targetFace then
+			targetFace:Clone().Parent = charHead
+		end
+	end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	for _, item in ipairs(targetModel:GetChildren()) do
+		if item:IsA("Accessory") then
+			local acc = item:Clone()
+			if humanoid then
+				humanoid:AddAccessory(acc)
+			else
+				acc.Parent = char
+			end
+		end
+	end
+
+	targetModel:Destroy()
+
+	if self.MaterialConfig.MaterialChanger then
+		self:ApplyMaterial()
+	end
 end
 
 function PlayerVisuals:ApplyMaterial()
@@ -296,17 +413,27 @@ function PlayerVisuals:RefreshAuras()
 end
 
 function PlayerVisuals:GetConfig()
-	return self.MaterialConfig, self.AuraConfig
+	return self.MaterialConfig, self.AuraConfig, self.AvatarConfig
 end
 
 function PlayerVisuals:Load()
-	localPlayer.CharacterAdded:Connect(function()
+	if localPlayer.Character then
+		backupDefaultAvatar(localPlayer.Character)
+	end
+
+	localPlayer.CharacterAdded:Connect(function(char)
 		table.clear(originalPartData)
 		table.clear(originalTextures)
 		table.clear(originalClothing)
 		table.clear(originalSurfaceAppearances)
 
 		task.wait(0.8)
+		backupDefaultAvatar(char)
+
+		if self.AvatarConfig.Enabled and self.AvatarConfig.TargetUserId > 0 then
+			self:ApplyAvatar(self.AvatarConfig.TargetUserId)
+		end
+
 		if self.MaterialConfig.MaterialChanger then
 			self:ApplyMaterial()
 		end
