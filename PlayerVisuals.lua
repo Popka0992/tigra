@@ -1,11 +1,13 @@
 -- Services.
 local playersService = cloneref(game:GetService("Players"))
 local runService = cloneref(game:GetService("RunService"))
+local workspaceService = cloneref(game:GetService("Workspace"))
 
 local PlayerVisuals = {}
 PlayerVisuals.__index = PlayerVisuals
 
 local localPlayer = playersService.LocalPlayer
+local currentCamera = workspaceService.CurrentCamera
 
 local PARTICLE_AURA_DATA = {
 	{ "starlight", "rbxassetid://134645216613107" },
@@ -145,7 +147,6 @@ local originalAvatarItems = {}
 
 local activeRigClone = nil
 local syncConnection = nil
-local steppedConnection = nil
 local cloneAnimTracks = {}
 
 local function mapCharacterParts(character)
@@ -340,6 +341,7 @@ local function stopAllTracks(humanoid)
 	end
 end
 
+-- R6 клон с отключенной физикой.
 local function buildVisualR6()
 	local model = Instance.new("Model")
 	model.Name = "VisualR6_Clone"
@@ -359,6 +361,7 @@ local function buildVisualR6()
 
 	local root = makePart("HumanoidRootPart", Vector3.new(2, 2, 1))
 	root.Transparency = 1
+	root.Anchored = true
 
 	local torso = makePart("Torso", Vector3.new(2, 2, 1))
 	local head = makePart("Head", Vector3.new(2, 1, 1))
@@ -421,6 +424,14 @@ local function buildVisualR6()
 	cloneHum.RequiresNeck = false
 	cloneHum.PlatformStand = true
 	cloneHum.EvaluateStateMachine = false
+	cloneHum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+
+	for _, state in ipairs(Enum.HumanoidStateType:GetEnumItems()) do
+		pcall(function()
+			cloneHum:SetStateEnabled(state, false)
+		end)
+	end
+
 	Instance.new("Animator", cloneHum)
 
 	model.PrimaryPart = root
@@ -492,11 +503,6 @@ function PlayerVisuals:ResetRig()
 		syncConnection = nil
 	end
 
-	if steppedConnection then
-		steppedConnection:Disconnect()
-		steppedConnection = nil
-	end
-
 	for _, track in pairs(cloneAnimTracks) do
 		pcall(function()
 			track:Stop(0)
@@ -530,6 +536,8 @@ function PlayerVisuals:ApplyRig(rigType)
 	local realHum = char:FindFirstChildOfClass("Humanoid")
 	local realRoot = char:FindFirstChild("HumanoidRootPart")
 	if not (realHum and realRoot) then return end
+
+	currentCamera = workspaceService.CurrentCamera or currentCamera
 
 	local currentRig = realHum.RigType == Enum.HumanoidRigType.R6 and "R6" or "R15"
 	if rigType == "Default" or rigType == currentRig then
@@ -579,34 +587,8 @@ function PlayerVisuals:ApplyRig(rigType)
 			end
 		end
 
-		for _, clonePart in ipairs(clone:GetDescendants()) do
-			if clonePart:IsA("BasePart") then
-				clonePart.CanCollide = false
-				clonePart.CanTouch = false
-				clonePart.CanQuery = false
-				clonePart.Massless = true
-
-				for _, realPart in ipairs(char:GetDescendants()) do
-					if realPart:IsA("BasePart") then
-						local ncc = Instance.new("NoCollisionConstraint")
-						ncc.Part0 = clonePart
-						ncc.Part1 = realPart
-						ncc.Parent = clonePart
-					end
-				end
-			end
-		end
-
-		local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
-		local rootWeld = Instance.new("Weld")
-		rootWeld.Name = "RigSyncWeld"
-		rootWeld.Part0 = realRoot
-		rootWeld.Part1 = cloneRoot
-		rootWeld.C0 = CFrame.new(0, 0, 0)
-		rootWeld.C1 = CFrame.new(0, 0, 0)
-		rootWeld.Parent = cloneRoot
-
-		clone.Parent = workspace
+		-- Изоляция в CurrentCamera предотвращает физические коллизии с миром и игроком.
+		clone.Parent = currentCamera
 		activeRigClone = clone
 
 		local cloneHum = clone:FindFirstChildOfClass("Humanoid")
@@ -622,6 +604,7 @@ function PlayerVisuals:ApplyRig(rigType)
 				local a = Instance.new("Animation")
 				a.AnimationId = id
 				local tr = animator:LoadAnimation(a)
+				tr.Looped = true
 				a:Destroy()
 				return tr
 			end
@@ -631,22 +614,17 @@ function PlayerVisuals:ApplyRig(rigType)
 			cloneAnimTracks.jump = loadAnim(jumpId)
 		end
 
-		steppedConnection = runService.Stepped:Connect(function()
-			if not (activeRigClone and activeRigClone.Parent) then return end
-			for _, p in ipairs(activeRigClone:GetDescendants()) do
-				if p:IsA("BasePart") then
-					p.CanCollide = false
-					p.CanTouch = false
-					p.CanQuery = false
-				end
-			end
-		end)
-
 		syncConnection = runService.RenderStepped:Connect(function()
 			local currentChar = localPlayer.Character
 			if not (currentChar and activeRigClone and activeRigClone.Parent) then return end
 
+			local cRealRoot = currentChar:FindFirstChild("HumanoidRootPart")
 			local cRealHum = currentChar:FindFirstChildOfClass("Humanoid")
+			local cloneRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
+
+			if cRealRoot and cloneRoot then
+				cloneRoot.CFrame = cRealRoot.CFrame * CFrame.new(0, -0.15, 0)
+			end
 
 			if cRealHum and cloneAnimTracks.idle then
 				local inAir = cRealHum.FloorMaterial == Enum.Material.Air
