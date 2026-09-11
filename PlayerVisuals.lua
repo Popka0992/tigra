@@ -145,6 +145,7 @@ local originalAvatarItems = {}
 
 local activeRigClone = nil
 local syncConnection = nil
+local steppedConnection = nil
 local cloneAnimTracks = {}
 
 local function mapCharacterParts(character)
@@ -339,7 +340,6 @@ local function stopAllTracks(humanoid)
 	end
 end
 
--- Создание легковесного R6 макета со всеми стандартными точками крепления.
 local function buildVisualR6()
 	local model = Instance.new("Model")
 	model.Name = "VisualR6_Clone"
@@ -359,7 +359,6 @@ local function buildVisualR6()
 
 	local root = makePart("HumanoidRootPart", Vector3.new(2, 2, 1))
 	root.Transparency = 1
-	root.Anchored = true
 
 	local torso = makePart("Torso", Vector3.new(2, 2, 1))
 	local head = makePart("Head", Vector3.new(2, 1, 1))
@@ -396,13 +395,11 @@ local function buildVisualR6()
 		a.Parent = parent
 	end
 
-	-- Точки крепления головы.
 	makeAtt("FaceCenterAttachment", CFrame.new(0, 0, 0), head)
 	makeAtt("FaceFrontAttachment", CFrame.new(0, 0, -0.6), head)
 	makeAtt("HairAttachment", CFrame.new(0, 0.6, 0), head)
 	makeAtt("HatAttachment", CFrame.new(0, 0.6, 0), head)
 
-	-- Точки крепления торса.
 	makeAtt("NeckAttachment", CFrame.new(0, 1, 0), torso)
 	makeAtt("BodyFrontAttachment", CFrame.new(0, 0, -0.5), torso)
 	makeAtt("BodyBackAttachment", CFrame.new(0, 0, 0.5), torso)
@@ -412,7 +409,6 @@ local function buildVisualR6()
 	makeAtt("LeftCollarAttachment", CFrame.new(-1, 1, 0), torso)
 	makeAtt("RightCollarAttachment", CFrame.new(1, 1, 0), torso)
 
-	-- Точки крепления рук и ног.
 	makeAtt("LeftShoulderAttachment", CFrame.new(0, 1, 0), leftArm)
 	makeAtt("LeftGripAttachment", CFrame.new(0, -1, 0), leftArm)
 	makeAtt("RightShoulderAttachment", CFrame.new(0, 1, 0), rightArm)
@@ -420,7 +416,6 @@ local function buildVisualR6()
 	makeAtt("LeftFootAttachment", CFrame.new(0, -1, 0), leftLeg)
 	makeAtt("RightFootAttachment", CFrame.new(0, -1, 0), rightLeg)
 
-	-- Нефизический гуманоид для рендеринга текстур одежды и кожи.
 	local cloneHum = Instance.new("Humanoid", model)
 	cloneHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	cloneHum.RequiresNeck = false
@@ -497,6 +492,11 @@ function PlayerVisuals:ResetRig()
 		syncConnection = nil
 	end
 
+	if steppedConnection then
+		steppedConnection:Disconnect()
+		steppedConnection = nil
+	end
+
 	for _, track in pairs(cloneAnimTracks) do
 		pcall(function()
 			track:Stop(0)
@@ -528,7 +528,8 @@ function PlayerVisuals:ApplyRig(rigType)
 	local char = localPlayer.Character
 	if not char then return end
 	local realHum = char:FindFirstChildOfClass("Humanoid")
-	if not realHum then return end
+	local realRoot = char:FindFirstChild("HumanoidRootPart")
+	if not (realHum and realRoot) then return end
 
 	local currentRig = realHum.RigType == Enum.HumanoidRigType.R6 and "R6" or "R15"
 	if rigType == "Default" or rigType == currentRig then
@@ -541,7 +542,6 @@ function PlayerVisuals:ApplyRig(rigType)
 	if rigType == "R6" then
 		local clone = buildVisualR6()
 
-		-- Синхронизация цветов частей тела.
 		local colors = char:FindFirstChildOfClass("BodyColors")
 		if colors then
 			clone.Head.Color = colors.HeadColor3
@@ -562,7 +562,6 @@ function PlayerVisuals:ApplyRig(rigType)
 			end
 		end
 
-		-- Перенос одежды и аксессуаров.
 		for _, item in ipairs(char:GetChildren()) do
 			if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
 				item:Clone().Parent = clone
@@ -579,6 +578,33 @@ function PlayerVisuals:ApplyRig(rigType)
 				face:Clone().Parent = cloneHead
 			end
 		end
+
+		for _, clonePart in ipairs(clone:GetDescendants()) do
+			if clonePart:IsA("BasePart") then
+				clonePart.CanCollide = false
+				clonePart.CanTouch = false
+				clonePart.CanQuery = false
+				clonePart.Massless = true
+
+				for _, realPart in ipairs(char:GetDescendants()) do
+					if realPart:IsA("BasePart") then
+						local ncc = Instance.new("NoCollisionConstraint")
+						ncc.Part0 = clonePart
+						ncc.Part1 = realPart
+						ncc.Parent = clonePart
+					end
+				end
+			end
+		end
+
+		local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+		local rootWeld = Instance.new("Weld")
+		rootWeld.Name = "RigSyncWeld"
+		rootWeld.Part0 = realRoot
+		rootWeld.Part1 = cloneRoot
+		rootWeld.C0 = CFrame.new(0, 0, 0)
+		rootWeld.C1 = CFrame.new(0, 0, 0)
+		rootWeld.Parent = cloneRoot
 
 		clone.Parent = workspace
 		activeRigClone = clone
@@ -605,17 +631,22 @@ function PlayerVisuals:ApplyRig(rigType)
 			cloneAnimTracks.jump = loadAnim(jumpId)
 		end
 
+		steppedConnection = runService.Stepped:Connect(function()
+			if not (activeRigClone and activeRigClone.Parent) then return end
+			for _, p in ipairs(activeRigClone:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.CanCollide = false
+					p.CanTouch = false
+					p.CanQuery = false
+				end
+			end
+		end)
+
 		syncConnection = runService.RenderStepped:Connect(function()
 			local currentChar = localPlayer.Character
 			if not (currentChar and activeRigClone and activeRigClone.Parent) then return end
 
-			local realRoot = currentChar:FindFirstChild("HumanoidRootPart")
 			local cRealHum = currentChar:FindFirstChildOfClass("Humanoid")
-			local cloneRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
-
-			if realRoot and cloneRoot then
-				cloneRoot.CFrame = realRoot.CFrame * CFrame.new(0, -0.3, 0)
-			end
 
 			if cRealHum and cloneAnimTracks.idle then
 				local inAir = cRealHum.FloorMaterial == Enum.Material.Air
