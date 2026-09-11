@@ -1,5 +1,6 @@
 -- Services.
 local playersService = cloneref(game:GetService("Players"))
+local runService = cloneref(game:GetService("RunService"))
 
 local PlayerVisuals = {}
 PlayerVisuals.__index = PlayerVisuals
@@ -16,6 +17,97 @@ local PARTICLE_AURA_DATA = {
 	{ "flow", "rbxassetid://119913533725648" },
 	{ "star", "rbxassetid://73754563740680" },
 	{ "neon", "rbxassetid://18498709246" },
+}
+
+local ANIMATION_PACKS = {
+	["Zombie"] = {
+		idle = {"rbxassetid://616158929", "rbxassetid://616160018"},
+		walk = "rbxassetid://616168032",
+		run = "rbxassetid://616163682",
+		jump = "rbxassetid://616161997",
+		fall = "rbxassetid://616157476",
+		climb = "rbxassetid://616156119"
+	},
+	["Ninja"] = {
+		idle = {"rbxassetid://656117400", "rbxassetid://656118341"},
+		walk = "rbxassetid://656121766",
+		run = "rbxassetid://656118852",
+		jump = "rbxassetid://656117878",
+		fall = "rbxassetid://656115606",
+		climb = "rbxassetid://656114359"
+	},
+	["Oldschool"] = {
+		idle = {"rbxassetid://531982823", "rbxassetid://531983108"},
+		walk = "rbxassetid://531984791",
+		run = "rbxassetid://531984432",
+		jump = "rbxassetid://531984193",
+		fall = "rbxassetid://531983970",
+		climb = "rbxassetid://531983503"
+	},
+	["Mage"] = {
+		idle = {"rbxassetid://707742142", "rbxassetid://707817808"},
+		walk = "rbxassetid://707897766",
+		run = "rbxassetid://707828062",
+		jump = "rbxassetid://707853694",
+		fall = "rbxassetid://707829752",
+		climb = "rbxassetid://707826056"
+	},
+	["Toy"] = {
+		idle = {"rbxassetid://782841498", "rbxassetid://782845399"},
+		walk = "rbxassetid://782845399",
+		run = "rbxassetid://782841498",
+		jump = "rbxassetid://782847020",
+		fall = "rbxassetid://782846423",
+		climb = "rbxassetid://782843869"
+	},
+	["Cartoony"] = {
+		idle = {"rbxassetid://742637544", "rbxassetid://742638445"},
+		walk = "rbxassetid://742639556",
+		run = "rbxassetid://742638842",
+		jump = "rbxassetid://742637942",
+		fall = "rbxassetid://742637719",
+		climb = "rbxassetid://742636889"
+	},
+	["Superhero"] = {
+		idle = {"rbxassetid://616104706", "rbxassetid://616108001"},
+		walk = "rbxassetid://616117076",
+		run = "rbxassetid://616111295",
+		jump = "rbxassetid://616109964",
+		fall = "rbxassetid://616108001",
+		climb = "rbxassetid://616102801"
+	},
+	["Robot"] = {
+		idle = {"rbxassetid://616075485", "rbxassetid://616077812"},
+		walk = "rbxassetid://616090535",
+		run = "rbxassetid://616086087",
+		jump = "rbxassetid://616081944",
+		fall = "rbxassetid://616080332",
+		climb = "rbxassetid://616073868"
+	},
+	["Vampire"] = {
+		idle = {"rbxassetid://1083445855"},
+		walk = "rbxassetid://1083473930",
+		run = "rbxassetid://1083445855",
+		jump = "rbxassetid://1083461490",
+		fall = "rbxassetid://1083455383",
+		climb = "rbxassetid://1083439238"
+	},
+	["Levitation"] = {
+		idle = {"rbxassetid://616006778", "rbxassetid://616008987"},
+		walk = "rbxassetid://616013216",
+		run = "rbxassetid://616010382",
+		jump = "rbxassetid://616008987",
+		fall = "rbxassetid://616005863",
+		climb = "rbxassetid://616003713"
+	},
+	["Werewolf"] = {
+		idle = {"rbxassetid://1083112771", "rbxassetid://1083150839"},
+		walk = "rbxassetid://1083178370",
+		run = "rbxassetid://1083112771",
+		jump = "rbxassetid://1083143960",
+		fall = "rbxassetid://1083133505",
+		climb = "rbxassetid://1083091065"
+	}
 }
 
 PlayerVisuals.AuraNames = {}
@@ -48,11 +140,19 @@ PlayerVisuals.AvatarConfig = {
 	TargetUserId = 0
 }
 
+PlayerVisuals.RigAnimationConfig = {
+	RigType = "Default",
+	AnimationPack = "None"
+}
+
 local originalPartData = {}
 local originalTextures = {}
 local originalClothing = {}
 local originalSurfaceAppearances = {}
 local originalAvatarItems = {}
+
+local activeRigClone = nil
+local syncConnection = nil
 
 local function mapCharacterParts(character)
 	local parts = {}
@@ -173,7 +273,6 @@ local function isOptionSelected(values, option)
 	return false
 end
 
--- Ручное прикрепление и сварка аксессуара к частям персонажа.
 local function attachAccessory(character, accessory)
 	local handle = accessory:FindFirstChild("Handle")
 	if not (handle and handle:IsA("BasePart")) then
@@ -247,6 +346,169 @@ local function backupDefaultAvatar(char)
 			table.insert(originalAvatarItems, face:Clone())
 		end
 	end
+end
+
+function PlayerVisuals:ApplyAnimationPack(packName, targetCharacter)
+	local pack = ANIMATION_PACKS[packName]
+	local char = targetCharacter or localPlayer.Character
+	if not char then return end
+
+	local animate = char:FindFirstChild("Animate")
+	if not animate then return end
+
+	if not pack then
+		return
+	end
+
+	local function setAnim(folderName, id)
+		local folder = animate:FindFirstChild(folderName)
+		if folder then
+			for _, child in ipairs(folder:GetChildren()) do
+				if child:IsA("Animation") then
+					child.AnimationId = id
+				end
+			end
+		end
+	end
+
+	if pack.idle then
+		local idleFolder = animate:FindFirstChild("idle")
+		if idleFolder then
+			local anim1 = idleFolder:FindFirstChild("Animation1")
+			local anim2 = idleFolder:FindFirstChild("Animation2")
+			if anim1 and pack.idle[1] then anim1.AnimationId = pack.idle[1] end
+			if anim2 and pack.idle[2] then anim2.AnimationId = pack.idle[2] end
+		end
+	end
+
+	if pack.walk then setAnim("walk", pack.walk) end
+	if pack.run then setAnim("run", pack.run) end
+	if pack.jump then setAnim("jump", pack.jump) end
+	if pack.fall then setAnim("fall", pack.fall) end
+	if pack.climb then setAnim("climb", pack.climb) end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+				track:Stop()
+			end
+		end
+	end
+end
+
+function PlayerVisuals:ResetRig()
+	if syncConnection then
+		syncConnection:Disconnect()
+		syncConnection = nil
+	end
+
+	if activeRigClone then
+		activeRigClone:Destroy()
+		activeRigClone = nil
+	end
+
+	local char = localPlayer.Character
+	if char then
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.LocalTransparencyModifier = 0
+			elseif part:IsA("Decal") then
+				part.Transparency = 0
+			end
+		end
+	end
+end
+
+function PlayerVisuals:ApplyRig(rigType)
+	self:ResetRig()
+
+	if rigType == "Default" then
+		return
+	end
+
+	local char = localPlayer.Character
+	if not char then return end
+	local rootPart = char:FindFirstChild("HumanoidRootPart")
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not (rootPart and humanoid) then return end
+
+	local targetRigEnum = (rigType == "R6") and Enum.HumanoidRigType.R6 or Enum.HumanoidRigType.R15
+	local targetUserId = self.AvatarConfig.TargetUserId > 0 and self.AvatarConfig.TargetUserId or localPlayer.UserId
+
+	local desc
+	pcall(function()
+		desc = playersService:GetHumanoidDescriptionFromUserId(targetUserId)
+	end)
+	if not desc then
+		desc = Instance.new("HumanoidDescription")
+	end
+
+	local clone
+	local ok = pcall(function()
+		clone = playersService:CreateHumanoidModelFromDescription(desc, targetRigEnum)
+	end)
+
+	if not (ok and clone) then
+		return
+	end
+
+	clone.Name = "VisualRigClone"
+	local cloneHumanoid = clone:FindFirstChildOfClass("Humanoid")
+	local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+
+	if not (cloneHumanoid and cloneRoot) then
+		clone:Destroy()
+		return
+	end
+
+	cloneHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	cloneRoot.CanCollide = false
+	cloneRoot.Massless = true
+
+	for _, part in ipairs(clone:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = false
+			part.Massless = true
+		end
+	end
+
+	clone.Parent = workspace
+	activeRigClone = clone
+
+	if self.RigAnimationConfig.AnimationPack ~= "None" then
+		self:ApplyAnimationPack(self.RigAnimationConfig.AnimationPack, clone)
+	end
+
+	syncConnection = runService.RenderStepped:Connect(function()
+		local currentChar = localPlayer.Character
+		if not (currentChar and activeRigClone and activeRigClone.Parent) then
+			return
+		end
+
+		local realRoot = currentChar:FindFirstChild("HumanoidRootPart")
+		local realHumanoid = currentChar:FindFirstChildOfClass("Humanoid")
+		local fakeRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
+		local fakeHumanoid = activeRigClone:FindFirstChildOfClass("Humanoid")
+
+		if realRoot and fakeRoot then
+			fakeRoot.CFrame = realRoot.CFrame
+		end
+
+		if realHumanoid and fakeHumanoid then
+			fakeHumanoid:Move(realHumanoid.MoveDirection, false)
+			fakeHumanoid.Jump = realHumanoid.Jump
+		end
+
+		for _, part in ipairs(currentChar:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.LocalTransparencyModifier = 1
+			elseif part:IsA("Decal") then
+				part.Transparency = 1
+			end
+		end
+	end)
 end
 
 function PlayerVisuals:ResetAvatar()
@@ -466,7 +728,7 @@ function PlayerVisuals:RefreshAuras()
 end
 
 function PlayerVisuals:GetConfig()
-	return self.MaterialConfig, self.AuraConfig, self.AvatarConfig
+	return self.MaterialConfig, self.AuraConfig, self.AvatarConfig, self.RigAnimationConfig
 end
 
 function PlayerVisuals:Load()
@@ -475,6 +737,7 @@ function PlayerVisuals:Load()
 	end
 
 	localPlayer.CharacterAdded:Connect(function(char)
+		self:ResetRig()
 		table.clear(originalPartData)
 		table.clear(originalTextures)
 		table.clear(originalClothing)
@@ -485,6 +748,12 @@ function PlayerVisuals:Load()
 
 		if self.AvatarConfig.Enabled and self.AvatarConfig.TargetUserId > 0 then
 			self:ApplyAvatar(self.AvatarConfig.TargetUserId)
+		end
+
+		if self.RigAnimationConfig.RigType ~= "Default" then
+			self:ApplyRig(self.RigAnimationConfig.RigType)
+		elseif self.RigAnimationConfig.AnimationPack ~= "None" then
+			self:ApplyAnimationPack(self.RigAnimationConfig.AnimationPack)
 		end
 
 		if self.MaterialConfig.MaterialChanger then
