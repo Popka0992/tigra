@@ -9,6 +9,7 @@ PlayerVisuals.__index = PlayerVisuals
 local localPlayer = playersService.LocalPlayer
 local currentCamera = workspaceService.CurrentCamera
 
+-- Constants.
 local PARTICLE_AURA_DATA = {
 	{ "starlight", "rbxassetid://134645216613107" },
 	{ "heavenly", "rbxassetid://139300897520961" },
@@ -469,7 +470,6 @@ function PlayerVisuals:ApplyRig(rigType)
 			defaultAnimate:Destroy()
 		end
 
-		-- Удаление CharacterMesh разблокирует поддержку пользовательских материалов на R6 частях.
 		for _, child in ipairs(clone:GetChildren()) do
 			if child:IsA("CharacterMesh") then
 				child:Destroy()
@@ -488,6 +488,8 @@ function PlayerVisuals:ApplyRig(rigType)
 		cloneHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 		cloneHum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 		cloneHum.EvaluateStateMachine = false
+		cloneHum.AutoRotate = false
+		cloneHum.BreakJointsOnDeath = false
 
 		local disabledStates = {
 			Enum.HumanoidStateType.Climbing,
@@ -537,12 +539,22 @@ function PlayerVisuals:ApplyRig(rigType)
 			end
 		end
 
+		-- Отключение столкновения между всеми частями клона и реального персонажа.
 		for _, clonePart in ipairs(clone:GetDescendants()) do
 			if clonePart:IsA("BasePart") then
 				clonePart.CanCollide = false
 				clonePart.CanTouch = false
 				clonePart.CanQuery = false
 				clonePart.Massless = true
+
+				for _, charPart in ipairs(char:GetDescendants()) do
+					if charPart:IsA("BasePart") then
+						local noCollision = Instance.new("NoCollisionConstraint")
+						noCollision.Part0 = clonePart
+						noCollision.Part1 = charPart
+						noCollision.Parent = clonePart
+					end
+				end
 			end
 		end
 
@@ -567,6 +579,18 @@ function PlayerVisuals:ApplyRig(rigType)
 		cloneAnimTracks.idle = loadAnim(idleId)
 		cloneAnimTracks.walk = loadAnim(walkId)
 		cloneAnimTracks.jump = loadAnim(jumpId)
+
+		-- Принудительное подавление CanCollide перед шагом физики.
+		steppedConnection = runService.Stepped:Connect(function()
+			if not (activeRigClone and activeRigClone.Parent) then return end
+			for _, part in ipairs(activeRigClone:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+					part.CanTouch = false
+					part.CanQuery = false
+				end
+			end
+		end)
 
 		syncConnection = runService.RenderStepped:Connect(function()
 			local currentChar = localPlayer.Character
@@ -722,7 +746,6 @@ function PlayerVisuals:ApplyMaterial()
 	local mat = Enum.Material[self.MaterialConfig.SelectedMaterial] or Enum.Material.Neon
 
 	for _, target in ipairs(modelsToProcess) do
-		-- Удаление CharacterMesh на целевой модели.
 		for _, child in ipairs(target:GetChildren()) do
 			if child:IsA("CharacterMesh") then
 				child:Destroy()
@@ -739,7 +762,6 @@ function PlayerVisuals:ApplyMaterial()
 				end
 			end
 
-			-- Синхронизация BodyColors под выбранный цвет материала.
 			local bodyColors = target:FindFirstChildOfClass("BodyColors")
 			if bodyColors and self.MaterialConfig.CustomMaterialColor then
 				bodyColors.HeadColor3 = self.MaterialConfig.MaterialColor
