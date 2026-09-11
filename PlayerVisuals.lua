@@ -54,8 +54,8 @@ local ANIMATION_PACKS = {
 	},
 	["Toy"] = {
 		idle = {"rbxassetid://782841498", "rbxassetid://782845399"},
-		walk = "rbxassetid://782845399",
-		run = "rbxassetid://782841498",
+		walk = "rbxassetid://782843345",
+		run = "rbxassetid://782842708",
 		jump = "rbxassetid://782847020",
 		fall = "rbxassetid://782846423",
 		climb = "rbxassetid://782843869"
@@ -69,12 +69,12 @@ local ANIMATION_PACKS = {
 		climb = "rbxassetid://742636889"
 	},
 	["Superhero"] = {
-		idle = {"rbxassetid://616104706", "rbxassetid://616108001"},
-		walk = "rbxassetid://616117076",
-		run = "rbxassetid://616111295",
-		jump = "rbxassetid://616109964",
-		fall = "rbxassetid://616108001",
-		climb = "rbxassetid://616102801"
+		idle = {"rbxassetid://616111295", "rbxassetid://616113533"},
+		walk = "rbxassetid://616122287",
+		run = "rbxassetid://616117076",
+		jump = "rbxassetid://616115533",
+		fall = "rbxassetid://616114627",
+		climb = "rbxassetid://616113533"
 	},
 	["Robot"] = {
 		idle = {"rbxassetid://616075485", "rbxassetid://616077812"},
@@ -84,14 +84,6 @@ local ANIMATION_PACKS = {
 		fall = "rbxassetid://616080332",
 		climb = "rbxassetid://616073868"
 	},
-	["Vampire"] = {
-		idle = {"rbxassetid://1083445855"},
-		walk = "rbxassetid://1083473930",
-		run = "rbxassetid://1083445855",
-		jump = "rbxassetid://1083461490",
-		fall = "rbxassetid://1083455383",
-		climb = "rbxassetid://1083439238"
-	},
 	["Levitation"] = {
 		idle = {"rbxassetid://616006778", "rbxassetid://616008987"},
 		walk = "rbxassetid://616013216",
@@ -99,14 +91,6 @@ local ANIMATION_PACKS = {
 		jump = "rbxassetid://616008987",
 		fall = "rbxassetid://616005863",
 		climb = "rbxassetid://616003713"
-	},
-	["Werewolf"] = {
-		idle = {"rbxassetid://1083112771", "rbxassetid://1083150839"},
-		walk = "rbxassetid://1083178370",
-		run = "rbxassetid://1083112771",
-		jump = "rbxassetid://1083143960",
-		fall = "rbxassetid://1083133505",
-		climb = "rbxassetid://1083091065"
 	}
 }
 
@@ -153,6 +137,7 @@ local originalAvatarItems = {}
 
 local activeRigClone = nil
 local syncConnection = nil
+local cloneAnimTracks = {}
 
 local function mapCharacterParts(character)
 	local parts = {}
@@ -332,6 +317,19 @@ local function attachAccessory(character, accessory)
 	accessory.Parent = character
 end
 
+local function stopAllTracks(humanoid)
+	if not humanoid then return end
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if animator then
+		for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+			pcall(function()
+				track:Stop(0)
+				track:Destroy()
+			end)
+		end
+	end
+end
+
 local function backupDefaultAvatar(char)
 	table.clear(originalAvatarItems)
 	for _, item in ipairs(char:GetChildren()) do
@@ -349,16 +347,21 @@ local function backupDefaultAvatar(char)
 end
 
 function PlayerVisuals:ApplyAnimationPack(packName, targetCharacter)
-	local pack = ANIMATION_PACKS[packName]
 	local char = targetCharacter or localPlayer.Character
 	if not char then return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	stopAllTracks(humanoid)
 
 	local animate = char:FindFirstChild("Animate")
 	if not animate then return end
 
-	if not pack then
+	if packName == "None" then
 		return
 	end
+
+	local pack = ANIMATION_PACKS[packName]
+	if not pack then return end
 
 	local function setAnim(folderName, id)
 		local folder = animate:FindFirstChild(folderName)
@@ -387,15 +390,12 @@ function PlayerVisuals:ApplyAnimationPack(packName, targetCharacter)
 	if pack.fall then setAnim("fall", pack.fall) end
 	if pack.climb then setAnim("climb", pack.climb) end
 
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		local animator = humanoid:FindFirstChildOfClass("Animator")
-		if animator then
-			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-				track:Stop()
-			end
-		end
-	end
+	pcall(function()
+		animate.Enabled = false
+		task.defer(function()
+			animate.Enabled = true
+		end)
+	end)
 end
 
 function PlayerVisuals:ResetRig()
@@ -403,6 +403,14 @@ function PlayerVisuals:ResetRig()
 		syncConnection:Disconnect()
 		syncConnection = nil
 	end
+
+	for _, track in pairs(cloneAnimTracks) do
+		pcall(function()
+			track:Stop(0)
+			track:Destroy()
+		end)
+	end
+	table.clear(cloneAnimTracks)
 
 	if activeRigClone then
 		activeRigClone:Destroy()
@@ -430,9 +438,9 @@ function PlayerVisuals:ApplyRig(rigType)
 
 	local char = localPlayer.Character
 	if not char then return end
-	local rootPart = char:FindFirstChild("HumanoidRootPart")
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not (rootPart and humanoid) then return end
+	local realRoot = char:FindFirstChild("HumanoidRootPart")
+	local realHumanoid = char:FindFirstChildOfClass("Humanoid")
+	if not (realRoot and realHumanoid) then return end
 
 	local targetRigEnum = (rigType == "R6") and Enum.HumanoidRigType.R6 or Enum.HumanoidRigType.R15
 	local targetUserId = self.AvatarConfig.TargetUserId > 0 and self.AvatarConfig.TargetUserId or localPlayer.UserId
@@ -451,8 +459,12 @@ function PlayerVisuals:ApplyRig(rigType)
 	end)
 
 	if not (ok and clone) then
-		return
+		pcall(function()
+			clone = playersService:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), targetRigEnum)
+		end)
 	end
+
+	if not clone then return end
 
 	clone.Name = "VisualRigClone"
 	local cloneHumanoid = clone:FindFirstChildOfClass("Humanoid")
@@ -464,12 +476,18 @@ function PlayerVisuals:ApplyRig(rigType)
 	end
 
 	cloneHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	cloneHumanoid.PlatformStand = false
+	cloneRoot.Anchored = true
 	cloneRoot.CanCollide = false
+	cloneRoot.CanTouch = false
+	cloneRoot.CanQuery = false
 	cloneRoot.Massless = true
 
 	for _, part in ipairs(clone:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.CanCollide = false
+			part.CanTouch = false
+			part.CanQuery = false
 			part.Massless = true
 		end
 	end
@@ -477,8 +495,23 @@ function PlayerVisuals:ApplyRig(rigType)
 	clone.Parent = workspace
 	activeRigClone = clone
 
-	if self.RigAnimationConfig.AnimationPack ~= "None" then
-		self:ApplyAnimationPack(self.RigAnimationConfig.AnimationPack, clone)
+	local animator = cloneHumanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", cloneHumanoid)
+	local selectedPack = ANIMATION_PACKS[self.RigAnimationConfig.AnimationPack]
+
+	if selectedPack then
+		local function loadTrack(id)
+			if not id then return nil end
+			local anim = Instance.new("Animation")
+			anim.AnimationId = id
+			local track = animator:LoadAnimation(anim)
+			anim:Destroy()
+			return track
+		end
+
+		cloneAnimTracks.idle = loadTrack(selectedPack.idle and selectedPack.idle[1])
+		cloneAnimTracks.walk = loadTrack(selectedPack.walk)
+		cloneAnimTracks.jump = loadTrack(selectedPack.jump)
+		cloneAnimTracks.fall = loadTrack(selectedPack.fall)
 	end
 
 	syncConnection = runService.RenderStepped:Connect(function()
@@ -487,18 +520,31 @@ function PlayerVisuals:ApplyRig(rigType)
 			return
 		end
 
-		local realRoot = currentChar:FindFirstChild("HumanoidRootPart")
-		local realHumanoid = currentChar:FindFirstChildOfClass("Humanoid")
-		local fakeRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
-		local fakeHumanoid = activeRigClone:FindFirstChildOfClass("Humanoid")
+		local cRealRoot = currentChar:FindFirstChild("HumanoidRootPart")
+		local cRealHumanoid = currentChar:FindFirstChildOfClass("Humanoid")
+		local cCloneRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
 
-		if realRoot and fakeRoot then
-			fakeRoot.CFrame = realRoot.CFrame
+		if cRealRoot and cCloneRoot then
+			cCloneRoot.CFrame = cRealRoot.CFrame
 		end
 
-		if realHumanoid and fakeHumanoid then
-			fakeHumanoid:Move(realHumanoid.MoveDirection, false)
-			fakeHumanoid.Jump = realHumanoid.Jump
+		if cRealHumanoid and cloneAnimTracks.idle then
+			local isMoving = cRealHumanoid.MoveDirection.Magnitude > 0
+			local inAir = cRealHumanoid.FloorMaterial == Enum.Material.Air
+
+			if inAir then
+				if cloneAnimTracks.walk and cloneAnimTracks.walk.IsPlaying then cloneAnimTracks.walk:Stop(0.1) end
+				if cloneAnimTracks.idle and cloneAnimTracks.idle.IsPlaying then cloneAnimTracks.idle:Stop(0.1) end
+				if cloneAnimTracks.jump and not cloneAnimTracks.jump.IsPlaying then cloneAnimTracks.jump:Play(0.1) end
+			elseif isMoving then
+				if cloneAnimTracks.jump and cloneAnimTracks.jump.IsPlaying then cloneAnimTracks.jump:Stop(0.1) end
+				if cloneAnimTracks.idle and cloneAnimTracks.idle.IsPlaying then cloneAnimTracks.idle:Stop(0.1) end
+				if cloneAnimTracks.walk and not cloneAnimTracks.walk.IsPlaying then cloneAnimTracks.walk:Play(0.1) end
+			else
+				if cloneAnimTracks.jump and cloneAnimTracks.jump.IsPlaying then cloneAnimTracks.jump:Stop(0.1) end
+				if cloneAnimTracks.walk and cloneAnimTracks.walk.IsPlaying then cloneAnimTracks.walk:Stop(0.1) end
+				if cloneAnimTracks.idle and not cloneAnimTracks.idle.IsPlaying then cloneAnimTracks.idle:Play(0.1) end
+			end
 		end
 
 		for _, part in ipairs(currentChar:GetDescendants()) do
