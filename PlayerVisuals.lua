@@ -1,11 +1,13 @@
 -- Services.
 local playersService = cloneref(game:GetService("Players"))
 local runService = cloneref(game:GetService("RunService"))
+local workspaceService = cloneref(game:GetService("Workspace"))
 
 local PlayerVisuals = {}
 PlayerVisuals.__index = PlayerVisuals
 
 local localPlayer = playersService.LocalPlayer
+local currentCamera = workspaceService.CurrentCamera
 
 local PARTICLE_AURA_DATA = {
 	{ "starlight", "rbxassetid://134645216613107" },
@@ -142,10 +144,6 @@ local originalTextures = {}
 local originalClothing = {}
 local originalSurfaceAppearances = {}
 local originalAvatarItems = {}
-
-local cloneOriginalPartData = {}
-local cloneOriginalTextures = {}
-local cloneOriginalClothing = {}
 
 local activeRigClone = nil
 local syncConnection = nil
@@ -422,10 +420,6 @@ function PlayerVisuals:ResetRig()
 	end
 	table.clear(cloneAnimTracks)
 
-	table.clear(cloneOriginalClothing)
-	table.clear(cloneOriginalPartData)
-	table.clear(cloneOriginalTextures)
-
 	if activeRigClone then
 		activeRigClone:Destroy()
 		activeRigClone = nil
@@ -452,6 +446,8 @@ function PlayerVisuals:ApplyRig(rigType)
 	local realRoot = char:FindFirstChild("HumanoidRootPart")
 	if not (realHum and realRoot) then return end
 
+	currentCamera = workspaceService.CurrentCamera or currentCamera
+
 	local currentRig = realHum.RigType == Enum.HumanoidRigType.R6 and "R6" or "R15"
 	if rigType == "Default" or rigType == currentRig then
 		if self.RigAnimationConfig.AnimationPack ~= "None" then
@@ -473,6 +469,13 @@ function PlayerVisuals:ApplyRig(rigType)
 			defaultAnimate:Destroy()
 		end
 
+		-- Удаление CharacterMesh разблокирует поддержку пользовательских материалов на R6 частях.
+		for _, child in ipairs(clone:GetChildren()) do
+			if child:IsA("CharacterMesh") then
+				child:Destroy()
+			end
+		end
+
 		local cloneHum = clone:FindFirstChildOfClass("Humanoid")
 		local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
 		if not (cloneHum and cloneRoot) then
@@ -486,8 +489,23 @@ function PlayerVisuals:ApplyRig(rigType)
 		cloneHum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 		cloneHum.EvaluateStateMachine = false
 
-		for _, state in ipairs(Enum.HumanoidStateType:GetEnumItems()) do
-			pcall(function() cloneHum:SetStateEnabled(state, false) end)
+		local disabledStates = {
+			Enum.HumanoidStateType.Climbing,
+			Enum.HumanoidStateType.FallingDown,
+			Enum.HumanoidStateType.Flying,
+			Enum.HumanoidStateType.Freefall,
+			Enum.HumanoidStateType.GettingUp,
+			Enum.HumanoidStateType.Jumping,
+			Enum.HumanoidStateType.Landed,
+			Enum.HumanoidStateType.Physics,
+			Enum.HumanoidStateType.PlatformStanding,
+			Enum.HumanoidStateType.Ragdoll,
+			Enum.HumanoidStateType.Running,
+			Enum.HumanoidStateType.Seated,
+			Enum.HumanoidStateType.Swimming
+		}
+		for _, state in ipairs(disabledStates) do
+			pcall(cloneHum.SetStateEnabled, cloneHum, state, false)
 		end
 
 		cloneRoot.Anchored = true
@@ -525,19 +543,10 @@ function PlayerVisuals:ApplyRig(rigType)
 				clonePart.CanTouch = false
 				clonePart.CanQuery = false
 				clonePart.Massless = true
-
-				for _, realPart in ipairs(char:GetDescendants()) do
-					if realPart:IsA("BasePart") then
-						local ncc = Instance.new("NoCollisionConstraint")
-						ncc.Part0 = clonePart
-						ncc.Part1 = realPart
-						ncc.Parent = clonePart
-					end
-				end
 			end
 		end
 
-		clone.Parent = workspace
+		clone.Parent = currentCamera
 		activeRigClone = clone
 
 		local animator = cloneHum:FindFirstChildOfClass("Animator") or Instance.new("Animator", cloneHum)
@@ -559,17 +568,6 @@ function PlayerVisuals:ApplyRig(rigType)
 		cloneAnimTracks.walk = loadAnim(walkId)
 		cloneAnimTracks.jump = loadAnim(jumpId)
 
-		steppedConnection = runService.Stepped:Connect(function()
-			if not (activeRigClone and activeRigClone.Parent) then return end
-			for _, p in ipairs(activeRigClone:GetDescendants()) do
-				if p:IsA("BasePart") then
-					p.CanCollide = false
-					p.CanTouch = false
-					p.CanQuery = false
-				end
-			end
-		end)
-
 		syncConnection = runService.RenderStepped:Connect(function()
 			local currentChar = localPlayer.Character
 			if not (currentChar and activeRigClone and activeRigClone.Parent) then return end
@@ -579,7 +577,7 @@ function PlayerVisuals:ApplyRig(rigType)
 			local cCloneRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
 
 			if cRealRoot and cCloneRoot then
-				cCloneRoot.CFrame = cRealRoot.CFrame
+				cCloneRoot.CFrame = cRealRoot.CFrame * CFrame.new(0, -0.15, 0)
 			end
 
 			if cRealHum and cloneAnimTracks.idle then
@@ -713,33 +711,43 @@ function PlayerVisuals:ApplyAvatar(userId)
 end
 
 function PlayerVisuals:ApplyMaterial()
-	local targets = {}
+	local modelsToProcess = {}
 	if localPlayer.Character then
-		table.insert(targets, {model = localPlayer.Character, isClone = false})
+		table.insert(modelsToProcess, localPlayer.Character)
 	end
 	if activeRigClone and activeRigClone.Parent then
-		table.insert(targets, {model = activeRigClone, isClone = true})
+		table.insert(modelsToProcess, activeRigClone)
 	end
 
 	local mat = Enum.Material[self.MaterialConfig.SelectedMaterial] or Enum.Material.Neon
 
-	for _, info in ipairs(targets) do
-		local target = info.model
-		local isClone = info.isClone
-
-		local clothingStore = isClone and cloneOriginalClothing or originalClothing
-		local partStore = isClone and cloneOriginalPartData or originalPartData
-		local textureStore = isClone and cloneOriginalTextures or originalTextures
-		local saStore = isClone and {} or originalSurfaceAppearances
+	for _, target in ipairs(modelsToProcess) do
+		-- Удаление CharacterMesh на целевой модели.
+		for _, child in ipairs(target:GetChildren()) do
+			if child:IsA("CharacterMesh") then
+				child:Destroy()
+			end
+		end
 
 		if self.MaterialConfig.MaterialChanger then
 			for _, item in ipairs(target:GetChildren()) do
 				if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
-					if not clothingStore[item] then
-						clothingStore[item] = item.Parent
+					if not originalClothing[item] then
+						originalClothing[item] = item.Parent
 					end
 					item.Parent = nil
 				end
+			end
+
+			-- Синхронизация BodyColors под выбранный цвет материала.
+			local bodyColors = target:FindFirstChildOfClass("BodyColors")
+			if bodyColors and self.MaterialConfig.CustomMaterialColor then
+				bodyColors.HeadColor3 = self.MaterialConfig.MaterialColor
+				bodyColors.TorsoColor3 = self.MaterialConfig.MaterialColor
+				bodyColors.LeftArmColor3 = self.MaterialConfig.MaterialColor
+				bodyColors.RightArmColor3 = self.MaterialConfig.MaterialColor
+				bodyColors.LeftLegColor3 = self.MaterialConfig.MaterialColor
+				bodyColors.RightLegColor3 = self.MaterialConfig.MaterialColor
 			end
 
 			for _, obj in ipairs(target:GetDescendants()) do
@@ -748,13 +756,13 @@ function PlayerVisuals:ApplyMaterial()
 				end
 
 				if obj:IsA("SurfaceAppearance") then
-					if not saStore[obj] then
-						saStore[obj] = obj.Parent
+					if not originalSurfaceAppearances[obj] then
+						originalSurfaceAppearances[obj] = obj.Parent
 					end
 					obj.Parent = nil
 				elseif obj:IsA("BasePart") then
-					if not partStore[obj] then
-						partStore[obj] = {
+					if not originalPartData[obj] then
+						originalPartData[obj] = {
 							Material = obj.Material,
 							Color = obj.Color,
 							Transparency = obj.Transparency
@@ -762,16 +770,16 @@ function PlayerVisuals:ApplyMaterial()
 					end
 
 					if obj:IsA("MeshPart") then
-						if textureStore[obj] == nil then
-							textureStore[obj] = obj.TextureID
+						if originalTextures[obj] == nil then
+							originalTextures[obj] = obj.TextureID
 						end
 						obj.TextureID = ""
 					end
 
 					local specialMesh = obj:FindFirstChildOfClass("SpecialMesh")
 					if specialMesh then
-						if textureStore[specialMesh] == nil then
-							textureStore[specialMesh] = specialMesh.TextureId
+						if originalTextures[specialMesh] == nil then
+							originalTextures[specialMesh] = specialMesh.TextureId
 						end
 						specialMesh.TextureId = ""
 					end
@@ -784,21 +792,21 @@ function PlayerVisuals:ApplyMaterial()
 				end
 			end
 		else
-			for item, parent in pairs(clothingStore) do
+			for item, parent in pairs(originalClothing) do
 				if item and parent then
 					item.Parent = parent
 				end
 			end
-			table.clear(clothingStore)
+			table.clear(originalClothing)
 
-			for sa, parent in pairs(saStore) do
+			for sa, parent in pairs(originalSurfaceAppearances) do
 				if sa and parent then
 					sa.Parent = parent
 				end
 			end
-			table.clear(saStore)
+			table.clear(originalSurfaceAppearances)
 
-			for tObj, texture in pairs(textureStore) do
+			for tObj, texture in pairs(originalTextures) do
 				if tObj and tObj.Parent then
 					if tObj:IsA("MeshPart") then
 						tObj.TextureID = texture
@@ -807,16 +815,16 @@ function PlayerVisuals:ApplyMaterial()
 					end
 				end
 			end
-			table.clear(textureStore)
+			table.clear(originalTextures)
 
-			for part, data in pairs(partStore) do
+			for part, data in pairs(originalPartData) do
 				if part and part.Parent and part:IsA("BasePart") then
 					part.Material = data.Material
 					part.Color = data.Color
 					part.Transparency = data.Transparency
 				end
 			end
-			table.clear(partStore)
+			table.clear(originalPartData)
 		end
 	end
 end
