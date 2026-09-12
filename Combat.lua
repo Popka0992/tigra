@@ -1,4 +1,3 @@
-
 local cloneref = cloneref or function(o) return o end
 
 -- Services.
@@ -33,6 +32,9 @@ local CombatConfig = {
 	Wallbang = false,
 	ProjectionOverride = false,
 	MagicBullet = false,
+
+	TargetPlayers = true,
+	TargetBots = true,
 
 	TeamCheck = false,
 	DeadCheck = true,
@@ -82,17 +84,47 @@ circleInline.Filled = false
 circleInline.ZIndex = 2
 circleInline.Visible = false
 
+---Scan workspace for potential targets (Players & Bots).
+---@return table
+local function getTargetEntities()
+	local entities = {}
+	local myChar = localPlayer.Character
+
+	for _, obj in ipairs(workspaceService:GetChildren()) do
+		if not obj:IsA("Model") or obj == myChar then continue end
+
+		local humanoid = obj:FindFirstChildOfClass("Humanoid")
+		local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso")
+		if not (humanoid and root) then continue end
+		if CombatConfig.DeadCheck and humanoid.Health <= 0 then continue end
+
+		local player = playersService:GetPlayerFromCharacter(obj)
+		local isBot = (player == nil)
+
+		if isBot and not CombatConfig.TargetBots then continue end
+		if not isBot and not CombatConfig.TargetPlayers then continue end
+		if not isBot and CombatConfig.TeamCheck and localPlayer.Team and player.Team == localPlayer.Team then continue end
+
+		table.insert(entities, {
+			Model = obj,
+			Player = player,
+			IsBot = isBot,
+			Humanoid = humanoid,
+			RootPart = root
+		})
+	end
+
+	return entities
+end
+
 local function scanCharacterParts()
 	local updated = false
-	for _, player in ipairs(playersService:GetPlayers()) do
-		local char = player.Character
-		if char then
-			for _, child in ipairs(char:GetDescendants()) do
-				if child:IsA("BasePart") and not scannedPartsSet[child.Name] then
-					scannedPartsSet[child.Name] = true
-					table.insert(scannedPartsList, child.Name)
-					updated = true
-				end
+	for _, entity in ipairs(getTargetEntities()) do
+		for _, child in ipairs(entity.Model:GetDescendants()) do
+			if child:IsA("BasePart") and not scannedPartsSet[child.Name] then
+				scannedPartsSet[child.Name] = true
+				table.insert(scannedPartsList, child.Name)
+				updated = true
 			end
 		end
 	end
@@ -106,22 +138,15 @@ local function rollHitChance()
 end
 
 local function getClosestTarget()
-	local closestPart, closestPlr = nil, nil
+	local closestPart, closestTarget = nil, nil
 	local viewportSize = currentCamera.ViewportSize
 	local maxFovRadius = (viewportSize.X * (CombatConfig.FOV / currentCamera.FieldOfView)) / 2
 	local mousePos = userInputService:GetMouseLocation()
 	local camPos = currentCamera.CFrame.Position
 
-	for _, player in ipairs(playersService:GetPlayers()) do
-		if player == localPlayer then continue end
-		local char = player.Character
-		if not char then continue end
-
-		local humanoid = char:FindFirstChildOfClass("Humanoid")
-		if CombatConfig.DeadCheck and (not humanoid or humanoid.Health <= 0) then continue end
-		if CombatConfig.TeamCheck and localPlayer.Team and player.Team == localPlayer.Team then continue end
-
-		local part = char:FindFirstChild(CombatConfig.HitPart) or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+	for _, entity in ipairs(getTargetEntities()) do
+		local char = entity.Model
+		local part = char:FindFirstChild(CombatConfig.HitPart) or entity.RootPart or char:FindFirstChild("Head")
 		if not part or not part:IsA("BasePart") then continue end
 
 		local distToCam = (camPos - part.Position).Magnitude
@@ -134,11 +159,11 @@ local function getClosestTarget()
 		if dist <= maxFovRadius then
 			maxFovRadius = dist
 			closestPart = part
-			closestPlr = player
+			closestTarget = entity.Player or entity.Model
 		end
 	end
 
-	return closestPart, closestPlr
+	return closestPart, closestTarget
 end
 
 function Combat:GetConfig()
@@ -156,13 +181,6 @@ end
 
 function Combat:Load()
 	scanCharacterParts()
-
-	playersService.PlayerAdded:Connect(function(player)
-		player.CharacterAdded:Connect(function()
-			task.wait(1)
-			scanCharacterParts()
-		end)
-	end)
 
 	runService.RenderStepped:Connect(function()
 		currentCamera = workspaceService.CurrentCamera or currentCamera
@@ -219,19 +237,14 @@ function Combat:Load()
 
 		local targetSize = Vector3.new(CombatConfig.HitboxSize, CombatConfig.HitboxSize, CombatConfig.HitboxSize)
 
-		for _, player in ipairs(playersService:GetPlayers()) do
-			if player == localPlayer then continue end
-			local pChar = player.Character
-			if not pChar then continue end
-
+		for _, entity in ipairs(getTargetEntities()) do
+			local pChar = entity.Model
 			for _, part in ipairs(pChar:GetDescendants()) do
 				if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
 					local isDefaultLimb = (part.Name == "Head" or part.Name:find("Torso") or part.Name:find("Arm") or part.Name:find("Leg"))
 
 					local shouldExpand = false
-					if CombatConfig.HitboxPart == "All Parts" then
-						shouldExpand = true
-					elseif CombatConfig.HitboxPart == part.Name then
+					if CombatConfig.HitboxPart == "All Parts" or CombatConfig.HitboxPart == part.Name then
 						shouldExpand = true
 					end
 
