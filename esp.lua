@@ -1,4 +1,3 @@
-
 local cloneref = cloneref or function(o) return o end
 
 if not LPH_OBFUSCATED then
@@ -112,6 +111,9 @@ local ESPConfig = {
 	Keybind = { Enabled = false, Key = Enum.KeyCode.Insert },
 	Players = false,
 	LocalPlayer = false,
+	Bots = true,
+	BotTag = "[BOT] ",
+	TeamCheck = false,
 	LimitFPS = 70,
 	DynamicBoxes = true,
 	DynamicBoxesCheap = false,
@@ -743,8 +745,7 @@ local UpdateESPObj = LPHNoVirtualize(function(espObj, position, size, name, dist
 			for i = idx + 1, #espObj.Adornments do espObj.Adornments[i].Visible = false end
 
 		elseif chamType == "MeshChams" then
-			local playerOwner = Players:GetPlayerFromCharacter(instance)
-			if playerOwner then
+			if instance:IsA("Model") then
 				if not espObj.MeshShell or not espObj.MeshShell.Parent then
 					if espObj.MeshShell then espObj.MeshShell:Destroy() end
 					CleanupCharacterMeshChams(instance)
@@ -1372,10 +1373,27 @@ local ScanDirectories = LPHNoVirtualize(function()
 	if ESPConfig.Players then
 		for _, player in ipairs(Players:GetPlayers()) do
 			if not ESPConfig.LocalPlayer and player == LocalPlayer then continue end
+			if ESPConfig.TeamCheck and LocalPlayer.Team and player.Team == LocalPlayer.Team then continue end
 			if player.Character then
 				local humanoid = player.Character:FindFirstChild("Humanoid")
 				if humanoid and humanoid.Health > 0 then
-					newTracked[player.Character] = { name = player.Name, Cheap = false }
+					newTracked[player.Character] = { name = player.DisplayName or player.Name, Cheap = false }
+				end
+			end
+		end
+	end
+
+	if ESPConfig.Bots then
+		for _, child in ipairs(Workspace:GetChildren()) do
+			if child:IsA("Model") and child ~= LocalPlayer.Character and not newTracked[child] then
+				local player = Players:GetPlayerFromCharacter(child)
+				if not player then
+					local humanoid = child:FindFirstChildOfClass("Humanoid")
+					local root = child:FindFirstChild("HumanoidRootPart") or child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart")
+					if humanoid and root and humanoid.Health > 0 then
+						local tag = ESPConfig.BotTag or "[BOT] "
+						newTracked[child] = { name = tag .. child.Name, Cheap = false }
+					end
 				end
 			end
 		end
@@ -1508,6 +1526,9 @@ function ESP:Unload()
 
 	CleanupMeshChams(Workspace)
 	for _, player in ipairs(Players:GetPlayers()) do CleanupCharacterMeshChams(player.Character) end
+	for _, child in ipairs(Workspace:GetChildren()) do
+		if child:IsA("Model") then CleanupCharacterMeshChams(child) end
+	end
 	getgenv().SensoryESP_UI = nil
 end
 
