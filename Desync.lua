@@ -24,7 +24,12 @@ local DesyncConfig = {
 	AnimID = "616119360",
 	AnimPlaying = false,
 	AnimFreeze = false,
-	AnimFreezeTime = 0.0
+	AnimFreezeTime = 0.0,
+	VelocityDesync = false,
+	VelocityType = "low",
+	VelocityRotate = false,
+	VelocityHealthCheck = false,
+	VelocityHealthValue = 100
 }
 
 local currentAnimTrack = nil
@@ -178,6 +183,51 @@ function Desync:Load()
 			end
 			if DesyncConfig.AnimFreeze then
 				currentAnimTrack.TimePosition = DesyncConfig.AnimFreezeTime
+			end
+		end
+
+		if DesyncConfig.VelocityDesync and hrp and hum and hum.Health > 0 then
+			local isAboveHealth = DesyncConfig.VelocityHealthCheck and (hum.Health / hum.MaxHealth >= DesyncConfig.VelocityHealthValue / 100)
+			if not isAboveHealth then
+				local oldLinearVelocity = hrp.AssemblyLinearVelocity
+				local oldAngularVelocity = hrp.AssemblyAngularVelocity
+				local velocityType = DesyncConfig.VelocityType
+				local spoofVelocity = Vector3.zero
+
+				if velocityType == "high y" then
+					spoofVelocity = Vector3.new(0, 16384, 0)
+				elseif velocityType == "limit" then
+					spoofVelocity = Vector3.new(
+						math.random(-2147483648, 2147483647),
+						math.random(-2147483648, 2147483647),
+						math.random(-2147483648, 2147483647)
+					)
+				elseif velocityType == "low" then
+					spoofVelocity = Vector3.new(
+						math.random(1, 2) == 1 and -300 or 300,
+						math.random(1, 2) == 1 and -300 or 300,
+						math.random(1, 2) == 1 and -300 or 300
+					)
+				elseif velocityType == "high" then
+					spoofVelocity = Vector3.new(
+						math.random(1, 2) == 1 and -16384 or 16384,
+						math.random(1, 2) == 1 and -14384 or 16384,
+						math.random(1, 2) == 1 and -16384 or 16384
+					)
+				end
+
+				hrp.AssemblyLinearVelocity = spoofVelocity
+				if DesyncConfig.VelocityRotate then
+					hrp.AssemblyAngularVelocity = spoofVelocity
+				end
+
+				task.spawn(function()
+					runService.RenderStepped:Wait()
+					if hrp and hrp.Parent then
+						hrp.AssemblyLinearVelocity = oldLinearVelocity
+						hrp.AssemblyAngularVelocity = oldAngularVelocity
+					end
+				end)
 			end
 		end
 
