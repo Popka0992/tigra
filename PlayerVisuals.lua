@@ -1,924 +1,950 @@
--- Services.
-local playersService = cloneref(game:GetService("Players"))
-local runService = cloneref(game:GetService("RunService"))
-local workspaceService = cloneref(game:GetService("Workspace"))
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local InsertService = game:GetService("InsertService")
+
+local LocalPlayer = Players.LocalPlayer
 
 local PlayerVisuals = {}
 PlayerVisuals.__index = PlayerVisuals
 
-local localPlayer = playersService.LocalPlayer
-local currentCamera = workspaceService.CurrentCamera
-
--- Constants.
-local PARTICLE_AURA_DATA = {
-	{ "starlight", "rbxassetid://134645216613107" },
-	{ "heavenly", "rbxassetid://139300897520961" },
-	{ "ribbon", "rbxassetid://132069507632161" },
-	{ "sakura", "rbxassetid://81755778619404" },
-	{ "angel", "rbxassetid://97658130917593" },
-	{ "wind", "rbxassetid://80694081850877" },
-	{ "flow", "rbxassetid://119913533725648" },
-	{ "star", "rbxassetid://73754563740680" },
-	{ "neon", "rbxassetid://18498709246" },
+-- Config
+PlayerVisuals.Config = {
+    Material = {
+        MaterialChanger = false,
+        CustomMaterialColor = false,
+        MaterialColor = Color3.fromRGB(255, 255, 255),
+        SelectedMaterial = "ForceField",
+        MaterialTransparency = 0,
+        RemoveTextures = false,
+        RemoveDecals = false,
+        RemoveClothing = false
+    },
+    Aura = {
+        enabled = false,
+        color = Color3.fromRGB(255, 255, 255),
+        selectedAuras = "starlight",
+        scale = 1
+    },
+    Avatar = {
+        Enabled = false,
+        TargetUserId = 0
+    },
+    Rig = {
+        RigType = "Default",
+        AnimationPack = "None"
+    },
+    Dance = {
+        CurrentDance = "None",
+        Playing = false
+    }
 }
 
-local ANIMATION_PACKS = {
-	["Zombie"] = {
-		idle = {"rbxassetid://616158929", "rbxassetid://616160018"},
-		walk = "rbxassetid://616168032",
-		run = "rbxassetid://616163682",
-		jump = "rbxassetid://616161997",
-		fall = "rbxassetid://616157476",
-		climb = "rbxassetid://616156119",
-		r6_idle = "rbxassetid://215384594",
-		r6_walk = "rbxassetid://215384152"
-	},
-	["Ninja"] = {
-		idle = {"rbxassetid://656117400", "rbxassetid://656118341"},
-		walk = "rbxassetid://656121766",
-		run = "rbxassetid://656118852",
-		jump = "rbxassetid://656117878",
-		fall = "rbxassetid://656115606",
-		climb = "rbxassetid://656114359",
-		r6_idle = "rbxassetid://248234515",
-		r6_walk = "rbxassetid://248234386"
-	},
-	["Oldschool"] = {
-		idle = {"rbxassetid://531982823", "rbxassetid://531983108"},
-		walk = "rbxassetid://531984791",
-		run = "rbxassetid://531984432",
-		jump = "rbxassetid://531984193",
-		fall = "rbxassetid://531983970",
-		climb = "rbxassetid://531983503",
-		r6_idle = "rbxassetid://180435571",
-		r6_walk = "rbxassetid://180426354"
-	},
-	["Mage"] = {
-		idle = {"rbxassetid://707742142", "rbxassetid://707817808"},
-		walk = "rbxassetid://707897766",
-		run = "rbxassetid://707828062",
-		jump = "rbxassetid://707853694",
-		fall = "rbxassetid://707829752",
-		climb = "rbxassetid://707826056",
-		r6_idle = "rbxassetid://180435571",
-		r6_walk = "rbxassetid://180426354"
-	},
-	["Toy"] = {
-		idle = {"rbxassetid://782841498", "rbxassetid://782845399"},
-		walk = "rbxassetid://782843345",
-		run = "rbxassetid://782842708",
-		jump = "rbxassetid://782847020",
-		fall = "rbxassetid://782846423",
-		climb = "rbxassetid://782843869",
-		r6_idle = "rbxassetid://180435571",
-		r6_walk = "rbxassetid://180426354"
-	},
-	["Cartoony"] = {
-		idle = {"rbxassetid://742637544", "rbxassetid://742638445"},
-		walk = "rbxassetid://742639556",
-		run = "rbxassetid://742638842",
-		jump = "rbxassetid://742637942",
-		fall = "rbxassetid://742637719",
-		climb = "rbxassetid://742636889",
-		r6_idle = "rbxassetid://180435571",
-		r6_walk = "rbxassetid://180426354"
-	},
-	["Robot"] = {
-		idle = {"rbxassetid://616075485", "rbxassetid://616077812"},
-		walk = "rbxassetid://616090535",
-		run = "rbxassetid://616086087",
-		jump = "rbxassetid://616081944",
-		fall = "rbxassetid://616080332",
-		climb = "rbxassetid://616073868",
-		r6_idle = "rbxassetid://180435571",
-		r6_walk = "rbxassetid://180426354"
-	},
-	["Levitation"] = {
-		idle = {"rbxassetid://616006778", "rbxassetid://616008987"},
-		walk = "rbxassetid://616013216",
-		run = "rbxassetid://616010382",
-		jump = "rbxassetid://616008987",
-		fall = "rbxassetid://616005863",
-		climb = "rbxassetid://616003713",
-		r6_idle = "rbxassetid://180435571",
-		r6_walk = "rbxassetid://180426354"
-	}
+-- Dances
+PlayerVisuals.Dances = {
+    ["Baby Queen - Bouncy Twirl"] = "14352343065",
+    ["Floss"] = "10714340543",
+    ["Yungblud Happier Jump"] = "15609995579",
+    ["Godlike"] = "10714347256",
+    ["Mae Stephens - Dance"] = "16553163212",
+    ["Victory Dance"] = "15505456446",
+    ["Elton John - Heart Skip"] = "11309255148",
+    ["Sturdy Dance - Ice Spice"] = "14022830843"
 }
 
-PlayerVisuals.AuraNames = {}
-local particleAuraIdByName = {}
-
-for _, row in ipairs(PARTICLE_AURA_DATA) do
-	table.insert(PlayerVisuals.AuraNames, row[1])
-	particleAuraIdByName[row[1]] = row[2]
-end
-
-local loadedParticleAuras = {}
-local activeParticleAuras = {}
-
-PlayerVisuals.AuraConfig = {
-	enabled = false,
-	selectedAuras = {},
-	color = Color3.fromRGB(133, 220, 255)
+PlayerVisuals.DanceNames = {
+    "None",
+    "Baby Queen - Bouncy Twirl",
+    "Floss",
+    "Yungblud Happier Jump",
+    "Godlike",
+    "Mae Stephens - Dance",
+    "Victory Dance",
+    "Elton John - Heart Skip",
+    "Sturdy Dance - Ice Spice"
 }
 
-PlayerVisuals.MaterialConfig = {
-	MaterialChanger = false,
-	SelectedMaterial = "Neon",
-	MaterialColor = Color3.fromRGB(255, 255, 255),
-	CustomMaterialColor = false,
-	MaterialTransparency = 0
+-- Auras
+PlayerVisuals.AuraNames = {
+    "starlight",
+    "fire",
+    "electric",
+    "ghostly",
+    "galaxy",
+    "hearts",
+    "rings",
+    "frost",
+    "blood",
+    "divine",
+    "toxic",
+    "void",
+    "cosmic",
+    "cyberpunk",
+    "sakura",
+    "shadow",
+    "inferno",
+    "blizzard",
+    "solar",
+    "abyssal",
+    "energy_shield",
+    "lightning_storm",
+    "black_hole"
 }
 
-PlayerVisuals.AvatarConfig = {
-	Enabled = false,
-	TargetUserId = 0
+-- Animation Packs
+PlayerVisuals.AnimationPacks = {
+    ["Zombie"] = {
+        idle = {"616158929", "616160018"},
+        walk = "616168032",
+        run = "616163682",
+        jump = "616161997",
+        fall = "616157476",
+        climb = "616156119",
+        swim = "616165109"
+    },
+    ["Ninja"] = {
+        idle = {"656111812", "656112999"},
+        walk = "656121766",
+        run = "656118852",
+        jump = "656102624",
+        fall = "656097567",
+        climb = "656094524",
+        swim = "656115606"
+    },
+    ["Mage"] = {
+        idle = {"707838520", "707844054"},
+        walk = "707890450",
+        run = "707886475",
+        jump = "707858682",
+        fall = "707829767",
+        climb = "707826056",
+        swim = "707878819"
+    },
+    ["Toy"] = {
+        idle = {"782841498", "782845736"},
+        walk = "782843345",
+        run = "782841498",
+        jump = "782847020",
+        fall = "782838421",
+        climb = "782835825",
+        swim = "782842708"
+    },
+    ["Oldschool"] = {
+        idle = {"531982823", "531983354"},
+        walk = "531984793",
+        run = "531984432",
+        jump = "531984193",
+        fall = "531983976",
+        climb = "531983666",
+        swim = "531985225"
+    },
+    ["Cartoony"] = {
+        idle = {"742633271", "742634040"},
+        walk = "742640026",
+        run = "742638842",
+        jump = "742637942",
+        fall = "742637151",
+        climb = "742636889",
+        swim = "742639442"
+    },
+    ["Robot"] = {
+        idle = {"616088211", "616089859"},
+        walk = "616095330",
+        run = "616086089",
+        jump = "616083070",
+        fall = "616080277",
+        climb = "616079012",
+        swim = "616093557"
+    },
+    ["Levitation"] = {
+        idle = {"616006778", "616008087"},
+        walk = "616013216",
+        run = "616013216",
+        jump = "616008936",
+        fall = "616005863",
+        climb = "616003713",
+        swim = "616011509"
+    },
+    ["Vampire"] = {
+        idle = {"1083445855", "1083450166"},
+        walk = "1083473930",
+        run = "1083462077",
+        jump = "1083455352",
+        fall = "1083443587",
+        climb = "1083439238",
+        swim = "1083467475"
+    },
+    ["Superhero"] = {
+        idle = {"616111295", "616113007"},
+        walk = "616122287",
+        run = "616117076",
+        jump = "616115533",
+        fall = "616108001",
+        climb = "616104706",
+        swim = "616119936"
+    },
+    ["Bubbly"] = {
+        idle = {"910004836", "910009958"},
+        walk = "910034870",
+        run = "910025107",
+        jump = "910016857",
+        fall = "910001910",
+        climb = "909998743",
+        swim = "910028158"
+    },
+    ["Elder"] = {
+        idle = {"845397899", "845400528"},
+        walk = "845403856",
+        run = "845401761",
+        jump = "845398858",
+        fall = "845396048",
+        climb = "845392705",
+        swim = "845402693"
+    },
+    ["Knight"] = {
+        idle = {"657595757", "657568135"},
+        walk = "657552124",
+        run = "657564596",
+        jump = "657600338",
+        fall = "657593010",
+        climb = "657588720",
+        swim = "657561840"
+    },
+    ["Werewolf"] = {
+        idle = {"1083195517", "1083214717"},
+        walk = "1083178339",
+        run = "1083216690",
+        jump = "1083204919",
+        fall = "1083189019",
+        climb = "1083182000",
+        swim = "1083200785"
+    }
 }
 
-PlayerVisuals.RigAnimationConfig = {
-	RigType = "Default",
-	AnimationPack = "None"
-}
-
-local originalPartData = {}
-local originalTextures = {}
+-- State
+local originalPartProperties = {}
+local originalDecalProperties = {}
+local originalHumanoidDescription = nil
 local originalClothing = {}
-local originalSurfaceAppearances = {}
-local originalAvatarItems = {}
+local currentAuraAttachment = nil
+local currentDanceTrack = nil
+local currentDanceAnim = nil
+local r6ModelClone = nil
+local r6HeartbeatConnection = nil
 
-local activeRigClone = nil
-local syncConnection = nil
-local steppedConnection = nil
-local cloneAnimTracks = {}
-
-local function mapCharacterParts(character)
-	local parts = {}
-	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("BasePart") then
-			parts[child.Name] = child
-		end
-	end
-	return parts
+-- Helpers
+local function getCharacter()
+    return LocalPlayer and LocalPlayer.Character
 end
 
-local function getParticleAuraTemplate(name)
-	local cached = loadedParticleAuras[name]
-	if cached then return cached end
-	local id = particleAuraIdByName[name]
-	if not id then return nil end
-	local ok, result = pcall(function()
-		local getObj = getobjects or function(uri) return game:GetObjects(uri) end
-		return getObj(id)[1]
-	end)
-	if ok and result then
-		loadedParticleAuras[name] = result
-		return result
-	end
-	return nil
+local function getHumanoid(char)
+    char = char or getCharacter()
+    return char and char:FindFirstChildOfClass("Humanoid")
 end
 
-local function tintParticleSubtree(root, color)
-	if not color or not root then return end
-	local seq = ColorSequence.new(color)
-	local function tintOne(obj)
-		pcall(function()
-			if obj:IsA("ParticleEmitter") or obj:IsA("Beam") or obj:IsA("Trail") then
-				obj.Color = seq
-			elseif obj:IsA("PointLight") then
-				obj.Color = color
-			end
-		end)
-	end
-	tintOne(root)
-	for _, d in ipairs(root:GetDescendants()) do
-		tintOne(d)
-	end
+local function getRootPart(char)
+    char = char or getCharacter()
+    return char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
 end
 
-local function setParticleEmittersEnabledInSubtree(root, enabled)
-	if not root then return end
-	pcall(function()
-		if root:IsA("ParticleEmitter") then
-			root.Enabled = enabled
-		end
-	end)
-	for _, d in ipairs(root:GetDescendants()) do
-		pcall(function()
-			if d:IsA("ParticleEmitter") then
-				d.Enabled = enabled
-			end
-		end)
-	end
+local function getAnimator(humanoid)
+    if not humanoid then return nil end
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator", humanoid)
+    end
+    return animator
 end
 
-local function applyParticleAuraToCharacter(character, auraName, color)
-	local auraObj = getParticleAuraTemplate(auraName)
-	if not auraObj then return {} end
-
-	local localParts = mapCharacterParts(character)
-	local cloned = auraObj:Clone()
-	local created = {}
-
-	for _, part in ipairs(cloned:GetChildren()) do
-		local targetPart = localParts[part.Name]
-		if targetPart then
-			for _, child in ipairs(part:GetChildren()) do
-				pcall(function()
-					local inst = child:Clone()
-					inst.Name = "LarpticAuraParticle"
-					inst.Parent = targetPart
-					if color then
-						tintParticleSubtree(inst, color)
-					end
-					table.insert(created, inst)
-				end)
-			end
-		end
-	end
-
-	pcall(function() cloned:Destroy() end)
-
-	for _, p in ipairs(created) do
-		setParticleEmittersEnabledInSubtree(p, true)
-	end
-
-	return created
-end
-
-local function disableOneAura(auraName)
-	if activeParticleAuras[auraName] then
-		for _, p in ipairs(activeParticleAuras[auraName]) do
-			if p then
-				pcall(function() p:Destroy() end)
-			end
-		end
-		activeParticleAuras[auraName] = nil
-	end
-end
-
-local function isOptionSelected(values, option)
-	if type(values) == "table" then
-		if values[option] ~= nil then
-			return values[option]
-		end
-		for _, value in ipairs(values) do
-			if value == option then
-				return true
-			end
-		end
-	end
-	return false
-end
-
-local function attachAccessory(character, accessory)
-	local handle = accessory:FindFirstChild("Handle")
-	if not (handle and handle:IsA("BasePart")) then
-		accessory.Parent = character
-		return
-	end
-
-	handle.Anchored = false
-	handle.CanCollide = false
-	handle.CanTouch = false
-	handle.CanQuery = false
-	handle.Massless = true
-
-	for _, weld in ipairs(handle:GetDescendants()) do
-		if weld:IsA("JointInstance") or weld:IsA("WeldConstraint") then
-			weld:Destroy()
-		end
-	end
-
-	local handleAttachment = handle:FindFirstChildOfClass("Attachment")
-	local targetPart, targetAttachment = nil, nil
-
-	if handleAttachment then
-		for _, part in ipairs(character:GetChildren()) do
-			if part:IsA("BasePart") then
-				local att = part:FindFirstChild(handleAttachment.Name)
-				if att and att:IsA("Attachment") then
-					targetAttachment = att
-					targetPart = part
-					break
-				end
-			end
-		end
-	end
-
-	if not targetPart then
-		targetPart = character:FindFirstChild("Head") or character:FindFirstChild("Torso")
-	end
-
-	if targetPart then
-		local weld = Instance.new("Weld")
-		weld.Name = "AccessoryWeld"
-		weld.Part0 = handle
-		weld.Part1 = targetPart
-
-		if targetAttachment and handleAttachment then
-			weld.C0 = handleAttachment.CFrame
-			weld.C1 = targetAttachment.CFrame
-		else
-			weld.C0 = CFrame.new()
-			weld.C1 = CFrame.new(0, 0.5, 0)
-		end
-
-		weld.Parent = handle
-		handle.CFrame = targetPart.CFrame * weld.C1 * weld.C0:Inverse()
-	end
-
-	accessory.Parent = character
-end
-
-local function stopAllTracks(humanoid)
-	if not humanoid then return end
-	local animator = humanoid:FindFirstChildOfClass("Animator")
-	if animator then
-		for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-			pcall(function()
-				track:Stop(0)
-				track:Destroy()
-			end)
-		end
-	end
-end
-
-local function backupDefaultAvatar(char)
-	table.clear(originalAvatarItems)
-	for _, item in ipairs(char:GetChildren()) do
-		if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
-			table.insert(originalAvatarItems, item:Clone())
-		end
-	end
-	local head = char:FindFirstChild("Head")
-	if head then
-		local face = head:FindFirstChildOfClass("Decal")
-		if face then
-			table.insert(originalAvatarItems, face:Clone())
-		end
-	end
-end
-
-function PlayerVisuals:ApplyAnimationPack(packName, targetCharacter)
-	local char = targetCharacter or localPlayer.Character
-	if not char then return end
-
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	stopAllTracks(humanoid)
-
-	local animate = char:FindFirstChild("Animate")
-	if not animate then return end
-
-	if packName == "None" then return end
-
-	local pack = ANIMATION_PACKS[packName]
-	if not pack then return end
-
-	local function setAnim(folderName, id)
-		local folder = animate:FindFirstChild(folderName)
-		if folder then
-			for _, child in ipairs(folder:GetChildren()) do
-				if child:IsA("Animation") then
-					child.AnimationId = id
-				end
-			end
-		end
-	end
-
-	if pack.idle then
-		local idleFolder = animate:FindFirstChild("idle")
-		if idleFolder then
-			local anim1 = idleFolder:FindFirstChild("Animation1")
-			local anim2 = idleFolder:FindFirstChild("Animation2")
-			if anim1 and pack.idle[1] then anim1.AnimationId = pack.idle[1] end
-			if anim2 and pack.idle[2] then anim2.AnimationId = pack.idle[2] end
-		end
-	end
-
-	if pack.walk then setAnim("walk", pack.walk) end
-	if pack.run then setAnim("run", pack.run) end
-	if pack.jump then setAnim("jump", pack.jump) end
-	if pack.fall then setAnim("fall", pack.fall) end
-	if pack.climb then setAnim("climb", pack.climb) end
-end
-
-function PlayerVisuals:ResetRig()
-	if syncConnection then
-		syncConnection:Disconnect()
-		syncConnection = nil
-	end
-
-	if steppedConnection then
-		steppedConnection:Disconnect()
-		steppedConnection = nil
-	end
-
-	for _, track in pairs(cloneAnimTracks) do
-		pcall(function()
-			track:Stop(0)
-			track:Destroy()
-		end)
-	end
-	table.clear(cloneAnimTracks)
-
-	if activeRigClone then
-		activeRigClone:Destroy()
-		activeRigClone = nil
-	end
-
-	local char = localPlayer.Character
-	if char then
-		for _, part in ipairs(char:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.LocalTransparencyModifier = 0
-			elseif part:IsA("Decal") then
-				part.Transparency = 0
-			end
-		end
-	end
-end
-
-function PlayerVisuals:ApplyRig(rigType)
-	self:ResetRig()
-
-	local char = localPlayer.Character
-	if not char then return end
-	local realHum = char:FindFirstChildOfClass("Humanoid")
-	local realRoot = char:FindFirstChild("HumanoidRootPart")
-	if not (realHum and realRoot) then return end
-
-	currentCamera = workspaceService.CurrentCamera or currentCamera
-
-	local currentRig = realHum.RigType == Enum.HumanoidRigType.R6 and "R6" or "R15"
-	if rigType == "Default" or rigType == currentRig then
-		if self.RigAnimationConfig.AnimationPack ~= "None" then
-			self:ApplyAnimationPack(self.RigAnimationConfig.AnimationPack)
-		end
-		if self.MaterialConfig.MaterialChanger then
-			self:ApplyMaterial()
-		end
-		return
-	end
-
-	if rigType == "R6" then
-		local cleanDesc = Instance.new("HumanoidDescription")
-		local clone = playersService:CreateHumanoidModelFromDescription(cleanDesc, Enum.HumanoidRigType.R6)
-		clone.Name = "VisualR6_Clone"
-
-		local defaultAnimate = clone:FindFirstChild("Animate")
-		if defaultAnimate then
-			defaultAnimate:Destroy()
-		end
-
-		for _, child in ipairs(clone:GetChildren()) do
-			if child:IsA("CharacterMesh") then
-				child:Destroy()
-			end
-		end
-
-		local cloneHum = clone:FindFirstChildOfClass("Humanoid")
-		local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
-		if not (cloneHum and cloneRoot) then
-			clone:Destroy()
-			return
-		end
-
-		cloneHum.PlatformStand = true
-		cloneHum.RequiresNeck = false
-		cloneHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-		cloneHum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-		cloneHum.EvaluateStateMachine = false
-		cloneHum.AutoRotate = false
-		cloneHum.BreakJointsOnDeath = false
-
-		local disabledStates = {
-			Enum.HumanoidStateType.Climbing,
-			Enum.HumanoidStateType.FallingDown,
-			Enum.HumanoidStateType.Flying,
-			Enum.HumanoidStateType.Freefall,
-			Enum.HumanoidStateType.GettingUp,
-			Enum.HumanoidStateType.Jumping,
-			Enum.HumanoidStateType.Landed,
-			Enum.HumanoidStateType.Physics,
-			Enum.HumanoidStateType.PlatformStanding,
-			Enum.HumanoidStateType.Ragdoll,
-			Enum.HumanoidStateType.Running,
-			Enum.HumanoidStateType.Seated,
-			Enum.HumanoidStateType.Swimming
-		}
-		for _, state in ipairs(disabledStates) do
-			pcall(cloneHum.SetStateEnabled, cloneHum, state, false)
-		end
-
-		cloneRoot.Anchored = true
-
-		local colors = char:FindFirstChildOfClass("BodyColors")
-		if colors then
-			colors:Clone().Parent = clone
-		end
-
-		for _, item in ipairs(char:GetChildren()) do
-			if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
-				item:Clone().Parent = clone
-			elseif item:IsA("Accessory") then
-				attachAccessory(clone, item:Clone())
-			end
-		end
-
-		local realHead = char:FindFirstChild("Head")
-		local cloneHead = clone:FindFirstChild("Head")
-		if realHead and cloneHead then
-			local realFace = realHead:FindFirstChildOfClass("Decal")
-			local cloneFace = cloneHead:FindFirstChildOfClass("Decal")
-			if realFace then
-				if cloneFace then
-					cloneFace.Texture = realFace.Texture
-				else
-					realFace:Clone().Parent = cloneHead
-				end
-			end
-		end
-
-		-- Отключение столкновения между всеми частями клона и реального персонажа.
-		for _, clonePart in ipairs(clone:GetDescendants()) do
-			if clonePart:IsA("BasePart") then
-				clonePart.CanCollide = false
-				clonePart.CanTouch = false
-				clonePart.CanQuery = false
-				clonePart.Massless = true
-
-				for _, charPart in ipairs(char:GetDescendants()) do
-					if charPart:IsA("BasePart") then
-						local noCollision = Instance.new("NoCollisionConstraint")
-						noCollision.Part0 = clonePart
-						noCollision.Part1 = charPart
-						noCollision.Parent = clonePart
-					end
-				end
-			end
-		end
-
-		clone.Parent = currentCamera
-		activeRigClone = clone
-
-		local animator = cloneHum:FindFirstChildOfClass("Animator") or Instance.new("Animator", cloneHum)
-		local selPack = ANIMATION_PACKS[self.RigAnimationConfig.AnimationPack]
-		local idleId = (selPack and selPack.r6_idle) or "rbxassetid://180435571"
-		local walkId = (selPack and selPack.r6_walk) or "rbxassetid://180426354"
-		local jumpId = "rbxassetid://125750702"
-
-		local function loadAnim(id)
-			local a = Instance.new("Animation")
-			a.AnimationId = id
-			local tr = animator:LoadAnimation(a)
-			tr.Looped = true
-			a:Destroy()
-			return tr
-		end
-
-		cloneAnimTracks.idle = loadAnim(idleId)
-		cloneAnimTracks.walk = loadAnim(walkId)
-		cloneAnimTracks.jump = loadAnim(jumpId)
-
-		-- Принудительное подавление CanCollide перед шагом физики.
-		steppedConnection = runService.Stepped:Connect(function()
-			if not (activeRigClone and activeRigClone.Parent) then return end
-			for _, part in ipairs(activeRigClone:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = false
-					part.CanTouch = false
-					part.CanQuery = false
-				end
-			end
-		end)
-
-		syncConnection = runService.RenderStepped:Connect(function()
-			local currentChar = localPlayer.Character
-			if not (currentChar and activeRigClone and activeRigClone.Parent) then return end
-
-			local cRealRoot = currentChar:FindFirstChild("HumanoidRootPart")
-			local cRealHum = currentChar:FindFirstChildOfClass("Humanoid")
-			local cCloneRoot = activeRigClone:FindFirstChild("HumanoidRootPart")
-
-			if cRealRoot and cCloneRoot then
-				cCloneRoot.CFrame = cRealRoot.CFrame * CFrame.new(0, -0.15, 0)
-			end
-
-			if cRealHum and cloneAnimTracks.idle then
-				local inAir = cRealHum.FloorMaterial == Enum.Material.Air
-				local isMoving = cRealHum.MoveDirection.Magnitude > 0.05
-
-				if inAir then
-					if cloneAnimTracks.walk and cloneAnimTracks.walk.IsPlaying then cloneAnimTracks.walk:Stop(0.1) end
-					if cloneAnimTracks.idle and cloneAnimTracks.idle.IsPlaying then cloneAnimTracks.idle:Stop(0.1) end
-					if cloneAnimTracks.jump and not cloneAnimTracks.jump.IsPlaying then cloneAnimTracks.jump:Play(0.1) end
-				elseif isMoving then
-					if cloneAnimTracks.jump and cloneAnimTracks.jump.IsPlaying then cloneAnimTracks.jump:Stop(0.1) end
-					if cloneAnimTracks.idle and cloneAnimTracks.idle.IsPlaying then cloneAnimTracks.idle:Stop(0.1) end
-					if cloneAnimTracks.walk and not cloneAnimTracks.walk.IsPlaying then cloneAnimTracks.walk:Play(0.1) end
-				else
-					if cloneAnimTracks.jump and cloneAnimTracks.jump.IsPlaying then cloneAnimTracks.jump:Stop(0.1) end
-					if cloneAnimTracks.walk and cloneAnimTracks.walk.IsPlaying then cloneAnimTracks.walk:Stop(0.1) end
-					if cloneAnimTracks.idle and not cloneAnimTracks.idle.IsPlaying then cloneAnimTracks.idle:Play(0.1) end
-				end
-			end
-
-			for _, p in ipairs(currentChar:GetDescendants()) do
-				if p:IsA("BasePart") then
-					p.LocalTransparencyModifier = 1
-				elseif p:IsA("Decal") then
-					p.Transparency = 1
-				end
-			end
-		end)
-
-		if self.MaterialConfig.MaterialChanger then
-			self:ApplyMaterial()
-		end
-	end
-end
-
-function PlayerVisuals:ResetAvatar()
-	local char = localPlayer.Character
-	if not char then return end
-
-	for _, item in ipairs(char:GetChildren()) do
-		if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
-			item:Destroy()
-		end
-	end
-
-	local head = char:FindFirstChild("Head")
-	if head then
-		local currentFace = head:FindFirstChildOfClass("Decal")
-		if currentFace then
-			currentFace:Destroy()
-		end
-	end
-
-	for _, item in ipairs(originalAvatarItems) do
-		local copy = item:Clone()
-		if copy:IsA("Accessory") then
-			attachAccessory(char, copy)
-		elseif copy:IsA("Decal") and head then
-			copy.Parent = head
-		else
-			copy.Parent = char
-		end
-	end
-
-	if self.RigAnimationConfig.RigType ~= "Default" then
-		self:ApplyRig(self.RigAnimationConfig.RigType)
-	end
-end
-
-function PlayerVisuals:ApplyAvatar(userId)
-	local char = localPlayer.Character
-	if not char or not tonumber(userId) then return end
-	local targetId = tonumber(userId)
-
-	local targetModel
-	local ok = pcall(function()
-		targetModel = playersService:CreateHumanoidModelFromUserId(targetId)
-	end)
-
-	if not (ok and targetModel) then
-		return
-	end
-
-	for _, item in ipairs(char:GetChildren()) do
-		if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
-			item:Destroy()
-		end
-	end
-
-	local targetColors = targetModel:FindFirstChildOfClass("BodyColors")
-	if targetColors then
-		targetColors:Clone().Parent = char
-	end
-
-	for _, item in ipairs(targetModel:GetChildren()) do
-		if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
-			item:Clone().Parent = char
-		end
-	end
-
-	local targetHead = targetModel:FindFirstChild("Head")
-	local charHead = char:FindFirstChild("Head")
-	if targetHead and charHead then
-		local currentFace = charHead:FindFirstChildOfClass("Decal")
-		if currentFace then
-			currentFace:Destroy()
-		end
-
-		local targetFace = targetHead:FindFirstChildOfClass("Decal")
-		if targetFace then
-			targetFace:Clone().Parent = charHead
-		end
-	end
-
-	for _, item in ipairs(targetModel:GetChildren()) do
-		if item:IsA("Accessory") then
-			attachAccessory(char, item:Clone())
-		end
-	end
-
-	targetModel:Destroy()
-
-	if self.MaterialConfig.MaterialChanger then
-		self:ApplyMaterial()
-	end
-
-	if self.RigAnimationConfig.RigType ~= "Default" then
-		self:ApplyRig(self.RigAnimationConfig.RigType)
-	end
+-- Material Changer
+function PlayerVisuals:SaveOriginalProperties()
+    local char = getCharacter()
+    if not char then return end
+
+    table.clear(originalPartProperties)
+    table.clear(originalDecalProperties)
+    table.clear(originalClothing)
+
+    for _, obj in ipairs(char:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            originalPartProperties[obj] = {
+                Material = obj.Material,
+                Color = obj.Color,
+                Transparency = obj.Transparency,
+                Reflectance = obj.Reflectance
+            }
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            originalDecalProperties[obj] = {
+                Transparency = obj.Transparency
+            }
+        elseif obj:IsA("Clothing") or obj:IsA("ShirtGraphic") then
+            table.insert(originalClothing, obj)
+        end
+    end
 end
 
 function PlayerVisuals:ApplyMaterial()
-	local modelsToProcess = {}
-	if localPlayer.Character then
-		table.insert(modelsToProcess, localPlayer.Character)
-	end
-	if activeRigClone and activeRigClone.Parent then
-		table.insert(modelsToProcess, activeRigClone)
-	end
+    local char = getCharacter()
+    if not char then return end
 
-	local mat = Enum.Material[self.MaterialConfig.SelectedMaterial] or Enum.Material.Neon
+    local cfg = self.Config.Material
+    if not cfg.MaterialChanger then
+        self:RestoreOriginalProperties()
+        return
+    end
 
-	for _, target in ipairs(modelsToProcess) do
-		for _, child in ipairs(target:GetChildren()) do
-			if child:IsA("CharacterMesh") then
-				child:Destroy()
-			end
-		end
+    local matEnum = Enum.Material[cfg.SelectedMaterial] or Enum.Material.ForceField
 
-		if self.MaterialConfig.MaterialChanger then
-			for _, item in ipairs(target:GetChildren()) do
-				if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
-					if not originalClothing[item] then
-						originalClothing[item] = item.Parent
-					end
-					item.Parent = nil
-				end
-			end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            if not originalPartProperties[part] then
+                originalPartProperties[part] = {
+                    Material = part.Material,
+                    Color = part.Color,
+                    Transparency = part.Transparency,
+                    Reflectance = part.Reflectance
+                }
+            end
 
-			local bodyColors = target:FindFirstChildOfClass("BodyColors")
-			if bodyColors and self.MaterialConfig.CustomMaterialColor then
-				bodyColors.HeadColor3 = self.MaterialConfig.MaterialColor
-				bodyColors.TorsoColor3 = self.MaterialConfig.MaterialColor
-				bodyColors.LeftArmColor3 = self.MaterialConfig.MaterialColor
-				bodyColors.RightArmColor3 = self.MaterialConfig.MaterialColor
-				bodyColors.LeftLegColor3 = self.MaterialConfig.MaterialColor
-				bodyColors.RightLegColor3 = self.MaterialConfig.MaterialColor
-			end
+            part.Material = matEnum
 
-			for _, obj in ipairs(target:GetDescendants()) do
-				if obj:IsA("BasePart") and obj.Name == "HumanoidRootPart" then
-					continue
-				end
+            if cfg.CustomMaterialColor then
+                part.Color = cfg.MaterialColor
+            end
 
-				if obj:IsA("SurfaceAppearance") then
-					if not originalSurfaceAppearances[obj] then
-						originalSurfaceAppearances[obj] = obj.Parent
-					end
-					obj.Parent = nil
-				elseif obj:IsA("BasePart") then
-					if not originalPartData[obj] then
-						originalPartData[obj] = {
-							Material = obj.Material,
-							Color = obj.Color,
-							Transparency = obj.Transparency
-						}
-					end
+            part.Transparency = cfg.MaterialTransparency
+        elseif part:IsA("Decal") or part:IsA("Texture") then
+            if not originalDecalProperties[part] then
+                originalDecalProperties[part] = {
+                    Transparency = part.Transparency
+                }
+            end
+            if cfg.RemoveDecals or cfg.RemoveTextures then
+                part.Transparency = 1
+            else
+                if originalDecalProperties[part] then
+                    part.Transparency = originalDecalProperties[part].Transparency
+                end
+            end
+        elseif part:IsA("Clothing") or part:IsA("ShirtGraphic") then
+            if cfg.RemoveClothing then
+                part.Parent = nil
+            end
+        elseif part:IsA("SurfaceAppearance") then
+            if cfg.RemoveTextures then
+                part.Parent = nil
+            end
+        end
+    end
+end
 
-					if obj:IsA("MeshPart") then
-						if originalTextures[obj] == nil then
-							originalTextures[obj] = obj.TextureID
-						end
-						obj.TextureID = ""
-					end
+function PlayerVisuals:RestoreOriginalProperties()
+    local char = getCharacter()
+    if not char then return end
 
-					local specialMesh = obj:FindFirstChildOfClass("SpecialMesh")
-					if specialMesh then
-						if originalTextures[specialMesh] == nil then
-							originalTextures[specialMesh] = specialMesh.TextureId
-						end
-						specialMesh.TextureId = ""
-					end
+    for part, props in pairs(originalPartProperties) do
+        if part and part.Parent then
+            part.Material = props.Material
+            part.Color = props.Color
+            part.Transparency = props.Transparency
+            part.Reflectance = props.Reflectance
+        end
+    end
 
-					obj.Material = mat
-					obj.Transparency = self.MaterialConfig.MaterialTransparency
-					if self.MaterialConfig.CustomMaterialColor then
-						obj.Color = self.MaterialConfig.MaterialColor
-					end
-				end
-			end
-		else
-			for item, parent in pairs(originalClothing) do
-				if item and parent then
-					item.Parent = parent
-				end
-			end
-			table.clear(originalClothing)
+    for decal, props in pairs(originalDecalProperties) do
+        if decal and decal.Parent then
+            decal.Transparency = props.Transparency
+        end
+    end
 
-			for sa, parent in pairs(originalSurfaceAppearances) do
-				if sa and parent then
-					sa.Parent = parent
-				end
-			end
-			table.clear(originalSurfaceAppearances)
+    for _, cloth in ipairs(originalClothing) do
+        if cloth and not cloth.Parent then
+            cloth.Parent = char
+        end
+    end
 
-			for tObj, texture in pairs(originalTextures) do
-				if tObj and tObj.Parent then
-					if tObj:IsA("MeshPart") then
-						tObj.TextureID = texture
-					elseif tObj:IsA("SpecialMesh") then
-						tObj.TextureId = texture
-					end
-				end
-			end
-			table.clear(originalTextures)
+    table.clear(originalPartProperties)
+    table.clear(originalDecalProperties)
+    table.clear(originalClothing)
+end
 
-			for part, data in pairs(originalPartData) do
-				if part and part.Parent and part:IsA("BasePart") then
-					part.Material = data.Material
-					part.Color = data.Color
-					part.Transparency = data.Transparency
-				end
-			end
-			table.clear(originalPartData)
-		end
-	end
+-- Avatar Changer
+function PlayerVisuals:ApplyAvatar(userId)
+    local char = getCharacter()
+    local hum = getHumanoid(char)
+    if not char or not hum then return end
+
+    userId = tonumber(userId)
+    if not userId or userId <= 0 then return end
+
+    self.Config.Avatar.TargetUserId = userId
+    self.Config.Avatar.Enabled = true
+
+    task.spawn(function()
+        pcall(function()
+            if not originalHumanoidDescription then
+                originalHumanoidDescription = hum:GetAppliedDescription()
+            end
+
+            local newDesc = Players:GetHumanoidDescriptionFromUserId(userId)
+            if newDesc then
+                hum:ApplyDescription(newDesc)
+                task.wait(0.15)
+                self:ApplyMaterial()
+            end
+        end)
+    end)
+end
+
+function PlayerVisuals:ResetAvatar()
+    local char = getCharacter()
+    local hum = getHumanoid(char)
+    if not char or not hum then return end
+
+    self.Config.Avatar.Enabled = false
+    self.Config.Avatar.TargetUserId = 0
+
+    task.spawn(function()
+        pcall(function()
+            if originalHumanoidDescription then
+                hum:ApplyDescription(originalHumanoidDescription)
+                originalHumanoidDescription = nil
+            else
+                local defaultDesc = Players:GetHumanoidDescriptionFromUserId(LocalPlayer.UserId)
+                if defaultDesc then
+                    hum:ApplyDescription(defaultDesc)
+                end
+            end
+            task.wait(0.15)
+            self:ApplyMaterial()
+        end)
+    end)
+end
+
+-- Aura System
+local function buildAuraEmitter(auraType, color, scale)
+    local emitter = Instance.new("ParticleEmitter")
+    emitter.Name = "VisualAura_" .. tostring(auraType)
+    emitter.LightEmission = 0.85
+    emitter.LightInfluence = 0.1
+    emitter.SpreadAngle = Vector2.new(180, 180)
+    emitter.Color = ColorSequence.new(color)
+
+    scale = math.clamp(scale or 1, 0.1, 10)
+
+    if auraType == "fire" or auraType == "inferno" then
+        emitter.Texture = "rbxassetid://258129524"
+        emitter.Rate = 40 * scale
+        emitter.Speed = NumberRange.new(2.5 * scale, 5.5 * scale)
+        emitter.Lifetime = NumberRange.new(0.6, 1.4)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.5 * scale),
+            NumberSequenceKeypoint.new(0.6, 1.4 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.1),
+            NumberSequenceKeypoint.new(0.7, 0.4),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.Acceleration = Vector3.new(0, 6 * scale, 0)
+
+    elseif auraType == "electric" or auraType == "lightning_storm" then
+        emitter.Texture = "rbxassetid://490918712"
+        emitter.Rate = 50 * scale
+        emitter.Speed = NumberRange.new(3 * scale, 7 * scale)
+        emitter.Lifetime = NumberRange.new(0.2, 0.5)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.8 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.8, 0.2),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.RotSpeed = NumberRange.new(-200, 200)
+
+    elseif auraType == "ghostly" or auraType == "shadow" or auraType == "void" then
+        emitter.Texture = "rbxassetid://243098098"
+        emitter.Rate = 22 * scale
+        emitter.Speed = NumberRange.new(1 * scale, 2.5 * scale)
+        emitter.Lifetime = NumberRange.new(1.5, 3)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.6 * scale),
+            NumberSequenceKeypoint.new(0.5, 2.2 * scale),
+            NumberSequenceKeypoint.new(1, 0.2 * scale)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.5),
+            NumberSequenceKeypoint.new(0.5, 0.2),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.Acceleration = Vector3.new(0, 1.5 * scale, 0)
+
+    elseif auraType == "galaxy" or auraType == "cosmic" then
+        emitter.Texture = "rbxassetid://645435862"
+        emitter.Rate = 30 * scale
+        emitter.Speed = NumberRange.new(1 * scale, 3 * scale)
+        emitter.Lifetime = NumberRange.new(1.2, 2.5)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.2 * scale),
+            NumberSequenceKeypoint.new(0.5, 1.8 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.2),
+            NumberSequenceKeypoint.new(0.7, 0.4),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.RotSpeed = NumberRange.new(-80, 80)
+
+    elseif auraType == "hearts" then
+        emitter.Texture = "rbxassetid://258127027"
+        emitter.Rate = 18 * scale
+        emitter.Speed = NumberRange.new(2 * scale, 4 * scale)
+        emitter.Lifetime = NumberRange.new(1, 2.2)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.4 * scale),
+            NumberSequenceKeypoint.new(0.8, 1.2 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.1),
+            NumberSequenceKeypoint.new(0.8, 0.3),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.Acceleration = Vector3.new(0, 3 * scale, 0)
+
+    elseif auraType == "rings" or auraType == "energy_shield" then
+        emitter.Texture = "rbxassetid://1084991219"
+        emitter.Rate = 15 * scale
+        emitter.Speed = NumberRange.new(0.5 * scale, 1.5 * scale)
+        emitter.Lifetime = NumberRange.new(1, 2)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1 * scale),
+            NumberSequenceKeypoint.new(1, 3.5 * scale)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.1),
+            NumberSequenceKeypoint.new(0.6, 0.5),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.RotSpeed = NumberRange.new(45, 90)
+
+    elseif auraType == "frost" or auraType == "blizzard" then
+        emitter.Texture = "rbxassetid://241594419"
+        emitter.Rate = 35 * scale
+        emitter.Speed = NumberRange.new(1 * scale, 3 * scale)
+        emitter.Lifetime = NumberRange.new(1, 2.5)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.5 * scale),
+            NumberSequenceKeypoint.new(0.5, 1 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.8, 0.4),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.Acceleration = Vector3.new(0, -2 * scale, 0)
+
+    elseif auraType == "blood" or auraType == "toxic" then
+        emitter.Texture = "rbxassetid://244905904"
+        emitter.Rate = 30 * scale
+        emitter.Speed = NumberRange.new(1.5 * scale, 3.5 * scale)
+        emitter.Lifetime = NumberRange.new(0.8, 1.8)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.8 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.1),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.Acceleration = Vector3.new(0, -4 * scale, 0)
+
+    elseif auraType == "sakura" then
+        emitter.Texture = "rbxassetid://1084961479"
+        emitter.Rate = 20 * scale
+        emitter.Speed = NumberRange.new(1.5 * scale, 3 * scale)
+        emitter.Lifetime = NumberRange.new(2, 4)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.6 * scale),
+            NumberSequenceKeypoint.new(1, 0.2 * scale)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.2),
+            NumberSequenceKeypoint.new(0.8, 0.5),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.RotSpeed = NumberRange.new(-60, 60)
+        emitter.Acceleration = Vector3.new(1 * scale, -1.5 * scale, 0)
+
+    elseif auraType == "cyberpunk" or auraType == "divine" or auraType == "solar" then
+        emitter.Texture = "rbxassetid://645435862"
+        emitter.Rate = 45 * scale
+        emitter.Speed = NumberRange.new(2 * scale, 5 * scale)
+        emitter.Lifetime = NumberRange.new(0.5, 1.5)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.4 * scale),
+            NumberSequenceKeypoint.new(0.5, 1.6 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.7, 0.3),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.RotSpeed = NumberRange.new(-120, 120)
+
+    elseif auraType == "black_hole" or auraType == "abyssal" then
+        emitter.Texture = "rbxassetid://1084991219"
+        emitter.Rate = 40 * scale
+        emitter.Speed = NumberRange.new(-3 * scale, -1 * scale)
+        emitter.Lifetime = NumberRange.new(0.8, 1.8)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 3 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.8),
+            NumberSequenceKeypoint.new(0.5, 0.2),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.RotSpeed = NumberRange.new(-180, 180)
+
+    else
+        emitter.Texture = "rbxassetid://1084961479"
+        emitter.Rate = 25 * scale
+        emitter.Speed = NumberRange.new(1.5 * scale, 3 * scale)
+        emitter.Lifetime = NumberRange.new(1, 2.2)
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.4 * scale),
+            NumberSequenceKeypoint.new(0.5, 1.2 * scale),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.2),
+            NumberSequenceKeypoint.new(0.8, 0.5),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        emitter.RotSpeed = NumberRange.new(-100, 100)
+    end
+
+    return emitter
+end
+
+function PlayerVisuals:ClearAuras()
+    if currentAuraAttachment then
+        currentAuraAttachment:Destroy()
+        currentAuraAttachment = nil
+    end
+
+    local char = getCharacter()
+    if char then
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") and string.find(obj.Name, "VisualAura_") then
+                obj:Destroy()
+            end
+        end
+    end
 end
 
 function PlayerVisuals:RefreshAuras()
-	local char = localPlayer.Character
-	if not char then return end
+    self:ClearAuras()
 
-	if not self.AuraConfig.enabled then
-		for _, auraName in ipairs(self.AuraNames) do
-			disableOneAura(auraName)
-		end
-		return
-	end
+    local cfg = self.Config.Aura
+    if not cfg.enabled then return end
 
-	local selectedAuras = self.AuraConfig.selectedAuras
-	for _, auraName in ipairs(self.AuraNames) do
-		disableOneAura(auraName)
-	end
+    local char = getCharacter()
+    local root = getRootPart(char)
+    if not root then return end
 
-	local col = self.AuraConfig.color
-	if type(selectedAuras) == "table" then
-		for _, auraName in ipairs(self.AuraNames) do
-			if isOptionSelected(selectedAuras, auraName) then
-				task.spawn(function()
-					local particles = applyParticleAuraToCharacter(char, auraName, col)
-					activeParticleAuras[auraName] = particles
-				end)
-			end
-		end
-	elseif type(selectedAuras) == "string" and selectedAuras ~= "" then
-		task.spawn(function()
-			local particles = applyParticleAuraToCharacter(char, selectedAuras, col)
-			activeParticleAuras[selectedAuras] = particles
-		end)
-	end
+    local attachment = Instance.new("Attachment")
+    attachment.Name = "VisualAura_Attachment"
+    attachment.Position = Vector3.new(0, 0, 0)
+    attachment.Parent = root
+
+    currentAuraAttachment = attachment
+
+    local emitter = buildAuraEmitter(cfg.selectedAuras or "starlight", cfg.color, cfg.scale or 1)
+    emitter.Parent = attachment
 end
 
+-- R6 Rig Engine
+local function constructR6Model()
+    local r6 = Instance.new("Model")
+    r6.Name = "R6_Visual_Clone"
+
+    local parts = {
+        HumanoidRootPart = {Size = Vector3.new(2, 2, 1), Trans = 1},
+        Torso = {Size = Vector3.new(2, 2, 1), Trans = 0},
+        Head = {Size = Vector3.new(1, 1, 1), Trans = 0},
+        ["Left Arm"] = {Size = Vector3.new(1, 2, 1), Trans = 0},
+        ["Right Arm"] = {Size = Vector3.new(1, 2, 1), Trans = 0},
+        ["Left Leg"] = {Size = Vector3.new(1, 2, 1), Trans = 0},
+        ["Right Leg"] = {Size = Vector3.new(1, 2, 1), Trans = 0}
+    }
+
+    local createdParts = {}
+    for partName, data in pairs(parts) do
+        local p = Instance.new("Part")
+        p.Name = partName
+        p.Size = data.Size
+        p.Transparency = data.Trans
+        p.CanCollide = false
+        p.CastShadow = false
+        p.Parent = r6
+        createdParts[partName] = p
+    end
+
+    local headMesh = Instance.new("SpecialMesh")
+    headMesh.MeshType = Enum.MeshType.Head
+    headMesh.Scale = Vector3.new(1.25, 1.25, 1.25)
+    headMesh.Parent = createdParts.Head
+
+    local function makeMotor(name, p0, p1, c0, c1)
+        local m = Instance.new("Motor6D")
+        m.Name = name
+        m.Part0 = p0
+        m.Part1 = p1
+        m.C0 = c0
+        m.C1 = c1
+        m.Parent = p0
+        return m
+    end
+
+    makeMotor("RootJoint", createdParts.HumanoidRootPart, createdParts.Torso,
+        CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0),
+        CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0))
+
+    makeMotor("Neck", createdParts.Torso, createdParts.Head,
+        CFrame.new(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0),
+        CFrame.new(0, -0.5, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0))
+
+    makeMotor("Left Shoulder", createdParts.Torso, createdParts["Left Arm"],
+        CFrame.new(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
+        CFrame.new(0.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0))
+
+    makeMotor("Right Shoulder", createdParts.Torso, createdParts["Right Arm"],
+        CFrame.new(1, 0.5, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        CFrame.new(-0.5, 0.5, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0))
+
+    makeMotor("Left Hip", createdParts.Torso, createdParts["Left Leg"],
+        CFrame.new(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
+        CFrame.new(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0))
+
+    makeMotor("Right Hip", createdParts.Torso, createdParts["Right Leg"],
+        CFrame.new(1, -1, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        CFrame.new(0.5, 1, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0))
+
+    r6.PrimaryPart = createdParts.HumanoidRootPart
+    return r6
+end
+
+function PlayerVisuals:ApplyRig(rigType)
+    self.Config.Rig.RigType = rigType
+    local char = getCharacter()
+    if not char then return end
+
+    local hum = getHumanoid(char)
+    if not hum then return end
+
+    if r6HeartbeatConnection then
+        r6HeartbeatConnection:Disconnect()
+        r6HeartbeatConnection = nil
+    end
+
+    if r6ModelClone then
+        r6ModelClone:Destroy()
+        r6ModelClone = nil
+    end
+
+    if rigType == "R6" and hum.RigType == Enum.HumanoidRigType.R15 then
+        r6ModelClone = constructR6Model()
+        r6ModelClone.Parent = char
+
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.Transparency = 1
+            end
+        end
+
+        local originalHrp = char:FindFirstChild("HumanoidRootPart")
+        r6HeartbeatConnection = RunService.RenderStepped:Connect(function()
+            if not char.Parent or not originalHrp or not r6ModelClone or not r6ModelClone.Parent then
+                if r6HeartbeatConnection then
+                    r6HeartbeatConnection:Disconnect()
+                    r6HeartbeatConnection = nil
+                end
+                return
+            end
+            r6ModelClone:SetPrimaryPartCFrame(originalHrp.CFrame)
+        end)
+    else
+        self:ResetRig()
+    end
+end
+
+function PlayerVisuals:ResetRig()
+    if r6HeartbeatConnection then
+        r6HeartbeatConnection:Disconnect()
+        r6HeartbeatConnection = nil
+    end
+
+    if r6ModelClone then
+        r6ModelClone:Destroy()
+        r6ModelClone = nil
+    end
+
+    local char = getCharacter()
+    if char then
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.Transparency = 0
+            end
+        end
+    end
+
+    self:ApplyMaterial()
+end
+
+-- Animation Packs
+function PlayerVisuals:ApplyAnimationPack(packName)
+    self.Config.Rig.AnimationPack = packName
+    if packName == "None" or not packName then return end
+
+    local pack = self.AnimationPacks[packName]
+    if not pack then return end
+
+    local char = getCharacter()
+    local animate = char and char:FindFirstChild("Animate")
+    if not animate then return end
+
+    pcall(function()
+        if animate:FindFirstChild("idle") then
+            local id1 = animate.idle:FindFirstChild("Animation1")
+            local id2 = animate.idle:FindFirstChild("Animation2")
+            if id1 and pack.idle[1] then id1.AnimationId = "rbxassetid://" .. pack.idle[1] end
+            if id2 and pack.idle[2] then id2.AnimationId = "rbxassetid://" .. pack.idle[2] end
+        end
+        if animate:FindFirstChild("walk") and animate.walk:FindFirstChild("WalkAnim") then
+            animate.walk.WalkAnim.AnimationId = "rbxassetid://" .. pack.walk
+        end
+        if animate:FindFirstChild("run") and animate.run:FindFirstChild("RunAnim") then
+            animate.run.RunAnim.AnimationId = "rbxassetid://" .. pack.run
+        end
+        if animate:FindFirstChild("jump") and animate.jump:FindFirstChild("JumpAnim") then
+            animate.jump.JumpAnim.AnimationId = "rbxassetid://" .. pack.jump
+        end
+        if animate:FindFirstChild("fall") and animate.fall:FindFirstChild("FallAnim") then
+            animate.fall.FallAnim.AnimationId = "rbxassetid://" .. pack.fall
+        end
+        if animate:FindFirstChild("climb") and animate.climb:FindFirstChild("ClimbAnim") and pack.climb then
+            animate.climb.ClimbAnim.AnimationId = "rbxassetid://" .. pack.climb
+        end
+        if animate:FindFirstChild("swim") and animate.swim:FindFirstChild("Swim") and pack.swim then
+            animate.swim.Swim.AnimationId = "rbxassetid://" .. pack.swim
+        end
+    end)
+end
+
+-- Dance Emotes
+function PlayerVisuals:StopDance()
+    if currentDanceTrack then
+        currentDanceTrack:Stop(0.15)
+        currentDanceTrack:Destroy()
+        currentDanceTrack = nil
+    end
+
+    if currentDanceAnim then
+        currentDanceAnim:Destroy()
+        currentDanceAnim = nil
+    end
+
+    self.Config.Dance.CurrentDance = "None"
+    self.Config.Dance.Playing = false
+end
+
+function PlayerVisuals:PlayDance(danceNameOrId)
+    self:StopDance()
+    if not danceNameOrId or danceNameOrId == "None" or danceNameOrId == "" then
+        return
+    end
+
+    local danceId = self.Dances[danceNameOrId] or danceNameOrId
+    local char = getCharacter()
+    local hum = getHumanoid(char)
+    local animator = getAnimator(hum)
+
+    if not animator then return end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://" .. tostring(danceId)
+    currentDanceAnim = anim
+
+    local success, track = pcall(function()
+        return animator:LoadAnimation(anim)
+    end)
+
+    if success and track then
+        currentDanceTrack = track
+        track.Priority = Enum.AnimationPriority.Action4
+        track.Looped = true
+        track:Play(0.1)
+
+        self.Config.Dance.CurrentDance = danceNameOrId
+        self.Config.Dance.Playing = true
+    end
+end
+
+-- Lifecycle
 function PlayerVisuals:GetConfig()
-	return self.MaterialConfig, self.AuraConfig, self.AvatarConfig, self.RigAnimationConfig
+    return self.Config.Material, self.Config.Aura, self.Config.Avatar, self.Config.Rig, self.Config.Dance
+end
+
+function PlayerVisuals:GetAuraList()
+    return self.AuraNames
+end
+
+function PlayerVisuals:GetDanceList()
+    return self.DanceNames
 end
 
 function PlayerVisuals:Load()
-	if localPlayer.Character then
-		backupDefaultAvatar(localPlayer.Character)
-	end
+    LocalPlayer.CharacterAdded:Connect(function(newChar)
+        task.wait(0.65)
 
-	localPlayer.CharacterAdded:Connect(function(char)
-		self:ResetRig()
-		table.clear(originalPartData)
-		table.clear(originalTextures)
-		table.clear(originalClothing)
-		table.clear(originalSurfaceAppearances)
+        self:SaveOriginalProperties()
 
-		task.wait(0.8)
-		backupDefaultAvatar(char)
+        if self.Config.Material.MaterialChanger then
+            self:ApplyMaterial()
+        end
 
-		if self.AvatarConfig.Enabled and self.AvatarConfig.TargetUserId > 0 then
-			self:ApplyAvatar(self.AvatarConfig.TargetUserId)
-		end
+        if self.Config.Aura.enabled then
+            self:RefreshAuras()
+        end
 
-		if self.RigAnimationConfig.RigType ~= "Default" then
-			self:ApplyRig(self.RigAnimationConfig.RigType)
-		elseif self.RigAnimationConfig.AnimationPack ~= "None" then
-			self:ApplyAnimationPack(self.RigAnimationConfig.AnimationPack)
-		end
+        if self.Config.Avatar.Enabled and self.Config.Avatar.TargetUserId > 0 then
+            self:ApplyAvatar(self.Config.Avatar.TargetUserId)
+        end
 
-		if self.MaterialConfig.MaterialChanger then
-			self:ApplyMaterial()
-		end
-		self:RefreshAuras()
-	end)
+        if self.Config.Rig.RigType ~= "Default" then
+            self:ApplyRig(self.Config.Rig.RigType)
+        end
+
+        if self.Config.Rig.AnimationPack ~= "None" then
+            self:ApplyAnimationPack(self.Config.Rig.AnimationPack)
+        end
+
+        if self.Config.Dance.Playing and self.Config.Dance.CurrentDance ~= "None" then
+            self:PlayDance(self.Config.Dance.CurrentDance)
+        end
+    end)
+
+    self:SaveOriginalProperties()
+    return self
 end
 
 return PlayerVisuals
