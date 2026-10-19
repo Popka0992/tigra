@@ -497,30 +497,48 @@ function PlayerVisuals:RefreshAuras()
 end
 
 -- R6 Rig.
-local function constructR6Model()
+local R15_BODY_PARTS = {
+	["Head"] = true,
+	["UpperTorso"] = true,
+	["LowerTorso"] = true,
+	["LeftUpperArm"] = true,
+	["LeftLowerArm"] = true,
+	["LeftHand"] = true,
+	["RightUpperArm"] = true,
+	["RightLowerArm"] = true,
+	["RightHand"] = true,
+	["LeftUpperLeg"] = true,
+	["LeftLowerLeg"] = true,
+	["LeftFoot"] = true,
+	["RightUpperLeg"] = true,
+	["RightLowerLeg"] = true,
+	["RightFoot"] = true
+}
+
+local function constructR6Model(char)
 	local r6 = Instance.new("Model")
 	r6.Name = "R6_Visual_Clone"
 
-	local parts = {
-		HumanoidRootPart = {Size = Vector3.new(2, 2, 1), Trans = 1},
-		Torso = {Size = Vector3.new(2, 2, 1), Trans = 0},
-		Head = {Size = Vector3.new(1, 1, 1), Trans = 0},
-		["Left Arm"] = {Size = Vector3.new(1, 2, 1), Trans = 0},
-		["Right Arm"] = {Size = Vector3.new(1, 2, 1), Trans = 0},
-		["Left Leg"] = {Size = Vector3.new(1, 2, 1), Trans = 0},
-		["Right Leg"] = {Size = Vector3.new(1, 2, 1), Trans = 0}
+	local partSizes = {
+		Head = Vector3.new(2, 1, 1),
+		Torso = Vector3.new(2, 2, 1),
+		["Left Arm"] = Vector3.new(1, 2, 1),
+		["Right Arm"] = Vector3.new(1, 2, 1),
+		["Left Leg"] = Vector3.new(1, 2, 1),
+		["Right Leg"] = Vector3.new(1, 2, 1)
 	}
 
 	local createdParts = {}
-	for partName, data in pairs(parts) do
-		local p = Instance.new("Part")
-		p.Name = partName
-		p.Size = data.Size
-		p.Transparency = data.Trans
-		p.CanCollide = false
-		p.CastShadow = false
-		p.Parent = r6
-	createdParts[partName] = p
+	for name, size in pairs(partSizes) do
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Size = size
+		part.Anchored = true
+		part.CanCollide = false
+		part.CastShadow = false
+		part.Material = Enum.Material.SmoothPlastic
+		part.Parent = r6
+		createdParts[name] = part
 	end
 
 	local headMesh = Instance.new("SpecialMesh")
@@ -528,43 +546,33 @@ local function constructR6Model()
 	headMesh.Scale = Vector3.new(1.25, 1.25, 1.25)
 	headMesh.Parent = createdParts.Head
 
-	local function makeMotor(name, p0, p1, c0, c1)
-		local m = Instance.new("Motor6D")
-		m.Name = name
-		m.Part0 = p0
-		m.Part1 = p1
-		m.C0 = c0
-		m.C1 = c1
-		m.Parent = p0
-		return m
+	-- Copy face.
+	local realHead = char:FindFirstChild("Head")
+	local realFace = realHead and realHead:FindFirstChildOfClass("Decal")
+	if realFace then
+		local faceClone = realFace:Clone()
+		faceClone.Parent = createdParts.Head
 	end
 
-	makeMotor("RootJoint", createdParts.HumanoidRootPart, createdParts.Torso,
-		CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0),
-		CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0))
+	-- Copy body colors.
+	local bodyColors = char:FindFirstChildOfClass("BodyColors")
+	if bodyColors then
+		createdParts.Head.Color = bodyColors.HeadColor3
+		createdParts.Torso.Color = bodyColors.TorsoColor3
+		createdParts["Left Arm"].Color = bodyColors.LeftArmColor3
+		createdParts["Right Arm"].Color = bodyColors.RightArmColor3
+		createdParts["Left Leg"].Color = bodyColors.LeftLegColor3
+		createdParts["Right Leg"].Color = bodyColors.RightLegColor3
+	end
 
-	makeMotor("Neck", createdParts.Torso, createdParts.Head,
-		CFrame.new(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0),
-		CFrame.new(0, -0.5, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0))
+	-- Copy clothes.
+	for _, item in ipairs(char:GetChildren()) do
+		if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
+			item:Clone().Parent = r6
+		end
+	end
 
-	makeMotor("Left Shoulder", createdParts.Torso, createdParts["Left Arm"],
-		CFrame.new(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
-		CFrame.new(0.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0))
-
-	makeMotor("Right Shoulder", createdParts.Torso, createdParts["Right Arm"],
-		CFrame.new(1, 0.5, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-		CFrame.new(-0.5, 0.5, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0))
-
-	makeMotor("Left Hip", createdParts.Torso, createdParts["Left Leg"],
-		CFrame.new(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
-		CFrame.new(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0))
-
-	makeMotor("Right Hip", createdParts.Torso, createdParts["Right Leg"],
-		CFrame.new(1, -1, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-		CFrame.new(0.5, 1, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0))
-
-	r6.PrimaryPart = createdParts.HumanoidRootPart
-	return r6
+	return r6, createdParts
 end
 
 function PlayerVisuals:ApplyRig(rigType)
@@ -586,26 +594,61 @@ function PlayerVisuals:ApplyRig(rigType)
 	end
 
 	if rigType == "R6" and hum.RigType == Enum.HumanoidRigType.R15 then
-		r6ModelClone = constructR6Model()
+		local r6Model, r6Parts = constructR6Model(char)
+		r6ModelClone = r6Model
 		r6ModelClone.Parent = char
 
+		-- Hide real R15 body parts.
 		for _, part in ipairs(char:GetChildren()) do
-			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			if part:IsA("BasePart") and R15_BODY_PARTS[part.Name] then
 				part.Transparency = 1
 			end
 		end
 
-		local originalHrp = char:FindFirstChild("HumanoidRootPart")
+		local realHead = char:FindFirstChild("Head")
+		local realFace = realHead and realHead:FindFirstChildOfClass("Decal")
+		if realFace then
+			realFace.Transparency = 1
+		end
+
+		local upperTorso = char:FindFirstChild("UpperTorso")
+		local leftUpperArm = char:FindFirstChild("LeftUpperArm")
+		local rightUpperArm = char:FindFirstChild("RightUpperArm")
+		local leftUpperLeg = char:FindFirstChild("LeftUpperLeg")
+		local rightUpperLeg = char:FindFirstChild("RightUpperLeg")
+
 		r6HeartbeatConnection = runService.RenderStepped:Connect(function()
-			if not char.Parent or not originalHrp or not r6ModelClone or not r6ModelClone.Parent then
+			if not char.Parent or not r6ModelClone or not r6ModelClone.Parent then
 				if r6HeartbeatConnection then
 					r6HeartbeatConnection:Disconnect()
 					r6HeartbeatConnection = nil
 				end
 				return
 			end
-			r6ModelClone:SetPrimaryPartCFrame(originalHrp.CFrame)
+
+			if realHead and r6Parts.Head then
+				r6Parts.Head.CFrame = realHead.CFrame
+			end
+			if upperTorso and r6Parts.Torso then
+				r6Parts.Torso.CFrame = upperTorso.CFrame * CFrame.new(0, -0.2, 0)
+			end
+			if leftUpperArm and r6Parts["Left Arm"] then
+				r6Parts["Left Arm"].CFrame = leftUpperArm.CFrame * CFrame.new(0, -0.4, 0)
+			end
+			if rightUpperArm and r6Parts["Right Arm"] then
+				r6Parts["Right Arm"].CFrame = rightUpperArm.CFrame * CFrame.new(0, -0.4, 0)
+			end
+			if leftUpperLeg and r6Parts["Left Leg"] then
+				r6Parts["Left Leg"].CFrame = leftUpperLeg.CFrame * CFrame.new(0, -0.4, 0)
+			end
+			if rightUpperLeg and r6Parts["Right Leg"] then
+				r6Parts["Right Leg"].CFrame = rightUpperLeg.CFrame * CFrame.new(0, -0.4, 0)
+			end
 		end)
+
+		if self.Config.Material.MaterialChanger then
+			self:ApplyMaterial()
+		end
 	else
 		self:ResetRig()
 	end
@@ -625,15 +668,20 @@ function PlayerVisuals:ResetRig()
 	local char = getCharacter()
 	if char then
 		for _, part in ipairs(char:GetChildren()) do
-			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			if part:IsA("BasePart") and R15_BODY_PARTS[part.Name] then
 				part.Transparency = 0
 			end
+		end
+
+		local realHead = char:FindFirstChild("Head")
+		local realFace = realHead and realHead:FindFirstChildOfClass("Decal")
+		if realFace then
+			realFace.Transparency = 0
 		end
 	end
 
 	self:ApplyMaterial()
 end
-
 -- Animation Packs.
 function PlayerVisuals:ApplyAnimationPack(packName)
 	self.Config.Rig.AnimationPack = packName
