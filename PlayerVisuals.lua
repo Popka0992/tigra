@@ -1,4 +1,4 @@
-local Players = game:GetService("Players")
+\local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
@@ -140,7 +140,6 @@ PlayerVisuals.AnimationPacks = {
 
 -- State
 local originalPartProperties = {}
-local originalHumanoidDescription = nil
 local auraCache = {}
 local currentAuraObject = nil
 local currentDanceTrack = nil
@@ -234,11 +233,138 @@ function PlayerVisuals:RestoreOriginalProperties()
     table.clear(originalPartProperties)
 end
 
--- Avatar Changer
+-- Robust Client-Side Avatar Cloner
+local function weldAccessory(char, acc)
+    local handle = acc:FindFirstChild("Handle")
+    if not handle then return end
+    handle.CanCollide = false
+
+    local handleAttachment = handle:FindFirstChildOfClass("Attachment")
+    if handleAttachment then
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then
+                local charAtt = part:FindFirstChild(handleAttachment.Name)
+                if charAtt and charAtt:IsA("Attachment") then
+                    local weld = Instance.new("Weld")
+                    weld.Name = "AccessoryWeld"
+                    weld.Part0 = handle
+                    weld.Part1 = part
+                    weld.C0 = handleAttachment.CFrame
+                    weld.C1 = charAtt.CFrame
+                    weld.Parent = handle
+                    return
+                end
+            end
+        end
+    end
+
+    local head = char:FindFirstChild("Head")
+    if head then
+        local weld = Instance.new("Weld")
+        weld.Name = "AccessoryWeld"
+        weld.Part0 = handle
+        weld.Part1 = head
+        weld.C0 = CFrame.new(0, 0, 0)
+        weld.C1 = CFrame.new(0, 0.5, 0)
+        weld.Parent = handle
+    end
+end
+
+local function applyModelToCharacter(char, sourceModel)
+    if not char or not sourceModel then return end
+
+    -- 1. Remove existing visual items
+    for _, item in ipairs(char:GetChildren()) do
+        if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
+            item:Destroy()
+        end
+    end
+
+    -- 2. Body Colors
+    local oldBodyColors = char:FindFirstChildOfClass("BodyColors")
+    if oldBodyColors then
+        oldBodyColors:Destroy()
+    end
+
+    local newBodyColors = sourceModel:FindFirstChildOfClass("BodyColors")
+    if newBodyColors then
+        local clonedColors = newBodyColors:Clone()
+        clonedColors.Parent = char
+
+        local colorMap = {
+            Head = clonedColors.HeadColor3,
+            Torso = clonedColors.TorsoColor3,
+            UpperTorso = clonedColors.TorsoColor3,
+            LowerTorso = clonedColors.TorsoColor3,
+            ["Left Arm"] = clonedColors.LeftArmColor3,
+            LeftUpperArm = clonedColors.LeftArmColor3,
+            LeftLowerArm = clonedColors.LeftArmColor3,
+            LeftHand = clonedColors.LeftArmColor3,
+            ["Right Arm"] = clonedColors.RightArmColor3,
+            RightUpperArm = clonedColors.RightArmColor3,
+            RightLowerArm = clonedColors.RightArmColor3,
+            RightHand = clonedColors.RightArmColor3,
+            ["Left Leg"] = clonedColors.LeftLegColor3,
+            LeftUpperLeg = clonedColors.LeftLegColor3,
+            LeftLowerLeg = clonedColors.LeftLegColor3,
+            LeftFoot = clonedColors.LeftLegColor3,
+            ["Right Leg"] = clonedColors.RightLegColor3,
+            RightUpperLeg = clonedColors.RightLegColor3,
+            RightLowerLeg = clonedColors.RightLegColor3,
+            RightFoot = clonedColors.RightLegColor3,
+        }
+        for partName, col in pairs(colorMap) do
+            local p = char:FindFirstChild(partName)
+            if p and p:IsA("BasePart") then
+                p.Color = col
+            end
+        end
+    end
+
+    -- 3. Clothing
+    for _, item in ipairs(sourceModel:GetChildren()) do
+        if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
+            item:Clone().Parent = char
+        end
+    end
+
+    -- 4. Head & Face
+    local sourceHead = sourceModel:FindFirstChild("Head")
+    local charHead = char:FindFirstChild("Head")
+    if sourceHead and charHead then
+        local srcFace = sourceHead:FindFirstChild("face")
+        local charFace = charHead:FindFirstChild("face")
+        if srcFace and srcFace:IsA("Decal") then
+            if not charFace then
+                charFace = Instance.new("Decal")
+                charFace.Name = "face"
+                charFace.Parent = charHead
+            end
+            charFace.Texture = srcFace.Texture
+        end
+
+        local srcMesh = sourceHead:FindFirstChildOfClass("SpecialMesh")
+        local charMesh = charHead:FindFirstChildOfClass("SpecialMesh")
+        if srcMesh and charMesh then
+            charMesh.MeshId = srcMesh.MeshId
+            charMesh.TextureId = srcMesh.TextureId
+            charMesh.Scale = srcMesh.Scale
+        end
+    end
+
+    -- 5. Accessories
+    for _, item in ipairs(sourceModel:GetChildren()) do
+        if item:IsA("Accessory") then
+            local acc = item:Clone()
+            acc.Parent = char
+            weldAccessory(char, acc)
+        end
+    end
+end
+
 function PlayerVisuals:ApplyAvatar(userId)
     local char = getCharacter()
-    local hum = getHumanoid(char)
-    if not char or not hum then return end
+    if not char then return end
 
     userId = tonumber(userId)
     if not userId or userId <= 0 then return end
@@ -247,47 +373,54 @@ function PlayerVisuals:ApplyAvatar(userId)
     self.Config.Avatar.Enabled = true
 
     task.spawn(function()
-        pcall(function()
-            if not originalHumanoidDescription then
-                originalHumanoidDescription = hum:GetAppliedDescription()
-            end
+        local sourceModel = nil
 
-            local newDesc = Players:GetHumanoidDescriptionFromUserId(userId)
-            if newDesc then
-                hum:ApplyDescription(newDesc)
-                task.wait(0.15)
-                self:ApplyMaterial()
-            end
+        -- Primary: CreateHumanoidModelFromUserId
+        local success, model = pcall(function()
+            return Players:CreateHumanoidModelFromUserId(userId)
         end)
+        if success and model then
+            sourceModel = model
+        else
+            -- Fallback: GetCharacterAppearanceAsync
+            local s2, app = pcall(function()
+                return Players:GetCharacterAppearanceAsync(userId)
+            end)
+            if s2 and app then
+                sourceModel = app
+            end
+        end
+
+        if sourceModel then
+            applyModelToCharacter(char, sourceModel)
+            sourceModel:Destroy()
+            task.wait(0.1)
+            self:ApplyMaterial()
+        end
     end)
 end
 
 function PlayerVisuals:ResetAvatar()
     local char = getCharacter()
-    local hum = getHumanoid(char)
-    if not char or not hum then return end
+    if not char then return end
 
     self.Config.Avatar.Enabled = false
     self.Config.Avatar.TargetUserId = 0
 
     task.spawn(function()
-        pcall(function()
-            if originalHumanoidDescription then
-                hum:ApplyDescription(originalHumanoidDescription)
-                originalHumanoidDescription = nil
-            else
-                local defaultDesc = Players:GetHumanoidDescriptionFromUserId(LocalPlayer.UserId)
-                if defaultDesc then
-                    hum:ApplyDescription(defaultDesc)
-                end
-            end
-            task.wait(0.15)
-            self:ApplyMaterial()
+        local success, model = pcall(function()
+            return Players:CreateHumanoidModelFromUserId(LocalPlayer.UserId)
         end)
+        if success and model then
+            applyModelToCharacter(char, model)
+            model:Destroy()
+            task.wait(0.1)
+            self:ApplyMaterial()
+        end
     end)
 end
 
--- Aura System (GetObjects)
+-- Aura System
 local function loadAuraAsset(assetId)
     if auraCache[assetId] then
         return auraCache[assetId]
