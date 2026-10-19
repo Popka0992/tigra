@@ -1,12 +1,30 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local InsertService = game:GetService("InsertService")
 
 local LocalPlayer = Players.LocalPlayer
 
 local PlayerVisuals = {}
 PlayerVisuals.__index = PlayerVisuals
+
+-- Particle Aura Data
+local PARTICLE_AURA_DATA = {
+    { "starlight", "rbxassetid://134645216613107" },
+    { "heavenly", "rbxassetid://139300897520961" },
+    { "ribbon", "rbxassetid://132069507632161" },
+    { "sakura", "rbxassetid://81755778619404" },
+    { "angel", "rbxassetid://97658130917593" },
+    { "wind", "rbxassetid://80694081850877" },
+    { "flow", "rbxassetid://119913533725648" },
+    { "star", "rbxassetid://73754563740680" },
+    { "neon", "rbxassetid://18498709246" },
+}
+
+PlayerVisuals.AuraMap = {}
+PlayerVisuals.AuraNames = {}
+for _, aura in ipairs(PARTICLE_AURA_DATA) do
+    PlayerVisuals.AuraMap[aura[1]] = aura[2]
+    table.insert(PlayerVisuals.AuraNames, aura[1])
+end
 
 -- Config
 PlayerVisuals.Config = {
@@ -15,16 +33,12 @@ PlayerVisuals.Config = {
         CustomMaterialColor = false,
         MaterialColor = Color3.fromRGB(255, 255, 255),
         SelectedMaterial = "ForceField",
-        MaterialTransparency = 0,
-        RemoveTextures = false,
-        RemoveDecals = false,
-        RemoveClothing = false
+        MaterialTransparency = 0
     },
     Aura = {
         enabled = false,
         color = Color3.fromRGB(255, 255, 255),
-        selectedAuras = "starlight",
-        scale = 1
+        selectedAuras = "starlight"
     },
     Avatar = {
         Enabled = false,
@@ -40,7 +54,7 @@ PlayerVisuals.Config = {
     }
 }
 
--- Dances
+-- Dances Database
 PlayerVisuals.Dances = {
     ["Baby Queen - Bouncy Twirl"] = "14352343065",
     ["Floss"] = "10714340543",
@@ -64,33 +78,6 @@ PlayerVisuals.DanceNames = {
     "Sturdy Dance - Ice Spice"
 }
 
--- Auras
-PlayerVisuals.AuraNames = {
-    "starlight",
-    "fire",
-    "electric",
-    "ghostly",
-    "galaxy",
-    "hearts",
-    "rings",
-    "frost",
-    "blood",
-    "divine",
-    "toxic",
-    "void",
-    "cosmic",
-    "cyberpunk",
-    "sakura",
-    "shadow",
-    "inferno",
-    "blizzard",
-    "solar",
-    "abyssal",
-    "energy_shield",
-    "lightning_storm",
-    "black_hole"
-}
-
 -- Animation Packs
 PlayerVisuals.AnimationPacks = {
     ["Zombie"] = {
@@ -98,135 +85,64 @@ PlayerVisuals.AnimationPacks = {
         walk = "616168032",
         run = "616163682",
         jump = "616161997",
-        fall = "616157476",
-        climb = "616156119",
-        swim = "616165109"
+        fall = "616157476"
     },
     ["Ninja"] = {
         idle = {"656111812", "656112999"},
         walk = "656121766",
         run = "656118852",
         jump = "656102624",
-        fall = "656097567",
-        climb = "656094524",
-        swim = "656115606"
+        fall = "656097567"
     },
     ["Mage"] = {
         idle = {"707838520", "707844054"},
         walk = "707890450",
         run = "707886475",
         jump = "707858682",
-        fall = "707829767",
-        climb = "707826056",
-        swim = "707878819"
+        fall = "707829767"
     },
     ["Toy"] = {
         idle = {"782841498", "782845736"},
         walk = "782843345",
         run = "782841498",
         jump = "782847020",
-        fall = "782838421",
-        climb = "782835825",
-        swim = "782842708"
+        fall = "782838421"
     },
     ["Oldschool"] = {
         idle = {"531982823", "531983354"},
         walk = "531984793",
         run = "531984432",
         jump = "531984193",
-        fall = "531983976",
-        climb = "531983666",
-        swim = "531985225"
+        fall = "531983976"
     },
     ["Cartoony"] = {
         idle = {"742633271", "742634040"},
         walk = "742640026",
         run = "742638842",
         jump = "742637942",
-        fall = "742637151",
-        climb = "742636889",
-        swim = "742639442"
+        fall = "742637151"
     },
     ["Robot"] = {
         idle = {"616088211", "616089859"},
         walk = "616095330",
         run = "616086089",
         jump = "616083070",
-        fall = "616080277",
-        climb = "616079012",
-        swim = "616093557"
+        fall = "616080277"
     },
     ["Levitation"] = {
         idle = {"616006778", "616008087"},
         walk = "616013216",
         run = "616013216",
         jump = "616008936",
-        fall = "616005863",
-        climb = "616003713",
-        swim = "616011509"
-    },
-    ["Vampire"] = {
-        idle = {"1083445855", "1083450166"},
-        walk = "1083473930",
-        run = "1083462077",
-        jump = "1083455352",
-        fall = "1083443587",
-        climb = "1083439238",
-        swim = "1083467475"
-    },
-    ["Superhero"] = {
-        idle = {"616111295", "616113007"},
-        walk = "616122287",
-        run = "616117076",
-        jump = "616115533",
-        fall = "616108001",
-        climb = "616104706",
-        swim = "616119936"
-    },
-    ["Bubbly"] = {
-        idle = {"910004836", "910009958"},
-        walk = "910034870",
-        run = "910025107",
-        jump = "910016857",
-        fall = "910001910",
-        climb = "909998743",
-        swim = "910028158"
-    },
-    ["Elder"] = {
-        idle = {"845397899", "845400528"},
-        walk = "845403856",
-        run = "845401761",
-        jump = "845398858",
-        fall = "845396048",
-        climb = "845392705",
-        swim = "845402693"
-    },
-    ["Knight"] = {
-        idle = {"657595757", "657568135"},
-        walk = "657552124",
-        run = "657564596",
-        jump = "657600338",
-        fall = "657593010",
-        climb = "657588720",
-        swim = "657561840"
-    },
-    ["Werewolf"] = {
-        idle = {"1083195517", "1083214717"},
-        walk = "1083178339",
-        run = "1083216690",
-        jump = "1083204919",
-        fall = "1083189019",
-        climb = "1083182000",
-        swim = "1083200785"
+        fall = "616005863"
     }
 }
 
 -- State
 local originalPartProperties = {}
-local originalDecalProperties = {}
 local originalHumanoidDescription = nil
-local originalClothing = {}
-local currentAuraAttachment = nil
+local auraCache = {}
+local currentAuraObject = nil
 local currentDanceTrack = nil
 local currentDanceAnim = nil
 local r6ModelClone = nil
@@ -244,7 +160,7 @@ end
 
 local function getRootPart(char)
     char = char or getCharacter()
-    return char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
+    return char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
 end
 
 local function getAnimator(humanoid)
@@ -262,23 +178,13 @@ function PlayerVisuals:SaveOriginalProperties()
     if not char then return end
 
     table.clear(originalPartProperties)
-    table.clear(originalDecalProperties)
-    table.clear(originalClothing)
-
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("BasePart") then
             originalPartProperties[obj] = {
                 Material = obj.Material,
                 Color = obj.Color,
-                Transparency = obj.Transparency,
-                Reflectance = obj.Reflectance
-            }
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            originalDecalProperties[obj] = {
                 Transparency = obj.Transparency
             }
-        elseif obj:IsA("Clothing") or obj:IsA("ShirtGraphic") then
-            table.insert(originalClothing, obj)
         end
     end
 end
@@ -301,39 +207,15 @@ function PlayerVisuals:ApplyMaterial()
                 originalPartProperties[part] = {
                     Material = part.Material,
                     Color = part.Color,
-                    Transparency = part.Transparency,
-                    Reflectance = part.Reflectance
+                    Transparency = part.Transparency
                 }
             end
 
             part.Material = matEnum
-
             if cfg.CustomMaterialColor then
                 part.Color = cfg.MaterialColor
             end
-
             part.Transparency = cfg.MaterialTransparency
-        elseif part:IsA("Decal") or part:IsA("Texture") then
-            if not originalDecalProperties[part] then
-                originalDecalProperties[part] = {
-                    Transparency = part.Transparency
-                }
-            end
-            if cfg.RemoveDecals or cfg.RemoveTextures then
-                part.Transparency = 1
-            else
-                if originalDecalProperties[part] then
-                    part.Transparency = originalDecalProperties[part].Transparency
-                end
-            end
-        elseif part:IsA("Clothing") or part:IsA("ShirtGraphic") then
-            if cfg.RemoveClothing then
-                part.Parent = nil
-            end
-        elseif part:IsA("SurfaceAppearance") then
-            if cfg.RemoveTextures then
-                part.Parent = nil
-            end
         end
     end
 end
@@ -347,25 +229,9 @@ function PlayerVisuals:RestoreOriginalProperties()
             part.Material = props.Material
             part.Color = props.Color
             part.Transparency = props.Transparency
-            part.Reflectance = props.Reflectance
         end
     end
-
-    for decal, props in pairs(originalDecalProperties) do
-        if decal and decal.Parent then
-            decal.Transparency = props.Transparency
-        end
-    end
-
-    for _, cloth in ipairs(originalClothing) do
-        if cloth and not cloth.Parent then
-            cloth.Parent = char
-        end
-    end
-
     table.clear(originalPartProperties)
-    table.clear(originalDecalProperties)
-    table.clear(originalClothing)
 end
 
 -- Avatar Changer
@@ -421,230 +287,31 @@ function PlayerVisuals:ResetAvatar()
     end)
 end
 
--- Aura System
-local function buildAuraEmitter(auraType, color, scale)
-    local emitter = Instance.new("ParticleEmitter")
-    emitter.Name = "VisualAura_" .. tostring(auraType)
-    emitter.LightEmission = 0.85
-    emitter.LightInfluence = 0.1
-    emitter.SpreadAngle = Vector2.new(180, 180)
-    emitter.Color = ColorSequence.new(color)
-
-    scale = math.clamp(scale or 1, 0.1, 10)
-
-    if auraType == "fire" or auraType == "inferno" then
-        emitter.Texture = "rbxassetid://258129524"
-        emitter.Rate = 40 * scale
-        emitter.Speed = NumberRange.new(2.5 * scale, 5.5 * scale)
-        emitter.Lifetime = NumberRange.new(0.6, 1.4)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.5 * scale),
-            NumberSequenceKeypoint.new(0.6, 1.4 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.1),
-            NumberSequenceKeypoint.new(0.7, 0.4),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.Acceleration = Vector3.new(0, 6 * scale, 0)
-
-    elseif auraType == "electric" or auraType == "lightning_storm" then
-        emitter.Texture = "rbxassetid://490918712"
-        emitter.Rate = 50 * scale
-        emitter.Speed = NumberRange.new(3 * scale, 7 * scale)
-        emitter.Lifetime = NumberRange.new(0.2, 0.5)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.8 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.8, 0.2),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.RotSpeed = NumberRange.new(-200, 200)
-
-    elseif auraType == "ghostly" or auraType == "shadow" or auraType == "void" then
-        emitter.Texture = "rbxassetid://243098098"
-        emitter.Rate = 22 * scale
-        emitter.Speed = NumberRange.new(1 * scale, 2.5 * scale)
-        emitter.Lifetime = NumberRange.new(1.5, 3)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.6 * scale),
-            NumberSequenceKeypoint.new(0.5, 2.2 * scale),
-            NumberSequenceKeypoint.new(1, 0.2 * scale)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.5),
-            NumberSequenceKeypoint.new(0.5, 0.2),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.Acceleration = Vector3.new(0, 1.5 * scale, 0)
-
-    elseif auraType == "galaxy" or auraType == "cosmic" then
-        emitter.Texture = "rbxassetid://645435862"
-        emitter.Rate = 30 * scale
-        emitter.Speed = NumberRange.new(1 * scale, 3 * scale)
-        emitter.Lifetime = NumberRange.new(1.2, 2.5)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.2 * scale),
-            NumberSequenceKeypoint.new(0.5, 1.8 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.2),
-            NumberSequenceKeypoint.new(0.7, 0.4),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.RotSpeed = NumberRange.new(-80, 80)
-
-    elseif auraType == "hearts" then
-        emitter.Texture = "rbxassetid://258127027"
-        emitter.Rate = 18 * scale
-        emitter.Speed = NumberRange.new(2 * scale, 4 * scale)
-        emitter.Lifetime = NumberRange.new(1, 2.2)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.4 * scale),
-            NumberSequenceKeypoint.new(0.8, 1.2 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.1),
-            NumberSequenceKeypoint.new(0.8, 0.3),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.Acceleration = Vector3.new(0, 3 * scale, 0)
-
-    elseif auraType == "rings" or auraType == "energy_shield" then
-        emitter.Texture = "rbxassetid://1084991219"
-        emitter.Rate = 15 * scale
-        emitter.Speed = NumberRange.new(0.5 * scale, 1.5 * scale)
-        emitter.Lifetime = NumberRange.new(1, 2)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1 * scale),
-            NumberSequenceKeypoint.new(1, 3.5 * scale)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.1),
-            NumberSequenceKeypoint.new(0.6, 0.5),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.RotSpeed = NumberRange.new(45, 90)
-
-    elseif auraType == "frost" or auraType == "blizzard" then
-        emitter.Texture = "rbxassetid://241594419"
-        emitter.Rate = 35 * scale
-        emitter.Speed = NumberRange.new(1 * scale, 3 * scale)
-        emitter.Lifetime = NumberRange.new(1, 2.5)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.5 * scale),
-            NumberSequenceKeypoint.new(0.5, 1 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.8, 0.4),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.Acceleration = Vector3.new(0, -2 * scale, 0)
-
-    elseif auraType == "blood" or auraType == "toxic" then
-        emitter.Texture = "rbxassetid://244905904"
-        emitter.Rate = 30 * scale
-        emitter.Speed = NumberRange.new(1.5 * scale, 3.5 * scale)
-        emitter.Lifetime = NumberRange.new(0.8, 1.8)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.8 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.1),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.Acceleration = Vector3.new(0, -4 * scale, 0)
-
-    elseif auraType == "sakura" then
-        emitter.Texture = "rbxassetid://1084961479"
-        emitter.Rate = 20 * scale
-        emitter.Speed = NumberRange.new(1.5 * scale, 3 * scale)
-        emitter.Lifetime = NumberRange.new(2, 4)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.6 * scale),
-            NumberSequenceKeypoint.new(1, 0.2 * scale)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.2),
-            NumberSequenceKeypoint.new(0.8, 0.5),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.RotSpeed = NumberRange.new(-60, 60)
-        emitter.Acceleration = Vector3.new(1 * scale, -1.5 * scale, 0)
-
-    elseif auraType == "cyberpunk" or auraType == "divine" or auraType == "solar" then
-        emitter.Texture = "rbxassetid://645435862"
-        emitter.Rate = 45 * scale
-        emitter.Speed = NumberRange.new(2 * scale, 5 * scale)
-        emitter.Lifetime = NumberRange.new(0.5, 1.5)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.4 * scale),
-            NumberSequenceKeypoint.new(0.5, 1.6 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.7, 0.3),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.RotSpeed = NumberRange.new(-120, 120)
-
-    elseif auraType == "black_hole" or auraType == "abyssal" then
-        emitter.Texture = "rbxassetid://1084991219"
-        emitter.Rate = 40 * scale
-        emitter.Speed = NumberRange.new(-3 * scale, -1 * scale)
-        emitter.Lifetime = NumberRange.new(0.8, 1.8)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 3 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.8),
-            NumberSequenceKeypoint.new(0.5, 0.2),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.RotSpeed = NumberRange.new(-180, 180)
-
-    else
-        emitter.Texture = "rbxassetid://1084961479"
-        emitter.Rate = 25 * scale
-        emitter.Speed = NumberRange.new(1.5 * scale, 3 * scale)
-        emitter.Lifetime = NumberRange.new(1, 2.2)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.4 * scale),
-            NumberSequenceKeypoint.new(0.5, 1.2 * scale),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.2),
-            NumberSequenceKeypoint.new(0.8, 0.5),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.RotSpeed = NumberRange.new(-100, 100)
+-- Aura System (GetObjects)
+local function loadAuraAsset(assetId)
+    if auraCache[assetId] then
+        return auraCache[assetId]
     end
-
-    return emitter
+    local success, objects = pcall(function()
+        return game:GetObjects(assetId)
+    end)
+    if success and objects and objects[1] then
+        auraCache[assetId] = objects[1]
+        return objects[1]
+    end
+    return nil
 end
 
 function PlayerVisuals:ClearAuras()
-    if currentAuraAttachment then
-        currentAuraAttachment:Destroy()
-        currentAuraAttachment = nil
+    if currentAuraObject then
+        currentAuraObject:Destroy()
+        currentAuraObject = nil
     end
 
     local char = getCharacter()
     if char then
         for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("ParticleEmitter") and string.find(obj.Name, "VisualAura_") then
+            if obj.Name == "PlayerVisuals_Aura" then
                 obj:Destroy()
             end
         end
@@ -661,18 +328,49 @@ function PlayerVisuals:RefreshAuras()
     local root = getRootPart(char)
     if not root then return end
 
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "VisualAura_Attachment"
-    attachment.Position = Vector3.new(0, 0, 0)
-    attachment.Parent = root
+    local assetId = self.AuraMap[cfg.selectedAuras]
+    if not assetId then return end
 
-    currentAuraAttachment = attachment
+    task.spawn(function()
+        local asset = loadAuraAsset(assetId)
+        if not asset or not char.Parent then return end
 
-    local emitter = buildAuraEmitter(cfg.selectedAuras or "starlight", cfg.color, cfg.scale or 1)
-    emitter.Parent = attachment
+        local auraInstance = asset:Clone()
+        auraInstance.Name = "PlayerVisuals_Aura"
+
+        if auraInstance:IsA("Attachment") then
+            auraInstance.Parent = root
+            currentAuraObject = auraInstance
+        else
+            local attachment = Instance.new("Attachment")
+            attachment.Name = "PlayerVisuals_Aura"
+            attachment.Parent = root
+            currentAuraObject = attachment
+
+            for _, child in ipairs(auraInstance:GetDescendants()) do
+                if child:IsA("ParticleEmitter") then
+                    child:Clone().Parent = attachment
+                end
+            end
+            if auraInstance:IsA("ParticleEmitter") then
+                auraInstance.Parent = attachment
+            end
+        end
+
+        if currentAuraObject and cfg.color then
+            for _, emitter in ipairs(currentAuraObject:GetDescendants()) do
+                if emitter:IsA("ParticleEmitter") then
+                    emitter.Color = ColorSequence.new(cfg.color)
+                end
+            end
+            if currentAuraObject:IsA("ParticleEmitter") then
+                currentAuraObject.Color = ColorSequence.new(cfg.color)
+            end
+        end
+    end)
 end
 
--- R6 Rig Engine
+-- R6 Rig
 local function constructR6Model()
     local r6 = Instance.new("Model")
     r6.Name = "R6_Visual_Clone"
@@ -841,12 +539,6 @@ function PlayerVisuals:ApplyAnimationPack(packName)
         if animate:FindFirstChild("fall") and animate.fall:FindFirstChild("FallAnim") then
             animate.fall.FallAnim.AnimationId = "rbxassetid://" .. pack.fall
         end
-        if animate:FindFirstChild("climb") and animate.climb:FindFirstChild("ClimbAnim") and pack.climb then
-            animate.climb.ClimbAnim.AnimationId = "rbxassetid://" .. pack.climb
-        end
-        if animate:FindFirstChild("swim") and animate.swim:FindFirstChild("Swim") and pack.swim then
-            animate.swim.Swim.AnimationId = "rbxassetid://" .. pack.swim
-        end
     end)
 end
 
@@ -857,27 +549,24 @@ function PlayerVisuals:StopDance()
         currentDanceTrack:Destroy()
         currentDanceTrack = nil
     end
-
     if currentDanceAnim then
         currentDanceAnim:Destroy()
         currentDanceAnim = nil
     end
-
     self.Config.Dance.CurrentDance = "None"
     self.Config.Dance.Playing = false
 end
 
-function PlayerVisuals:PlayDance(danceNameOrId)
+function PlayerVisuals:PlayDance(danceName)
     self:StopDance()
-    if not danceNameOrId or danceNameOrId == "None" or danceNameOrId == "" then
-        return
-    end
+    if not danceName or danceName == "None" or danceName == "" then return end
 
-    local danceId = self.Dances[danceNameOrId] or danceNameOrId
+    local danceId = self.Dances[danceName]
+    if not danceId then return end
+
     local char = getCharacter()
     local hum = getHumanoid(char)
     local animator = getAnimator(hum)
-
     if not animator then return end
 
     local anim = Instance.new("Animation")
@@ -894,7 +583,7 @@ function PlayerVisuals:PlayDance(danceNameOrId)
         track.Looped = true
         track:Play(0.1)
 
-        self.Config.Dance.CurrentDance = danceNameOrId
+        self.Config.Dance.CurrentDance = danceName
         self.Config.Dance.Playing = true
     end
 end
@@ -913,9 +602,8 @@ function PlayerVisuals:GetDanceList()
 end
 
 function PlayerVisuals:Load()
-    LocalPlayer.CharacterAdded:Connect(function(newChar)
+    LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.65)
-
         self:SaveOriginalProperties()
 
         if self.Config.Material.MaterialChanger then
