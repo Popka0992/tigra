@@ -159,6 +159,7 @@ local R15_BODY_PARTS = {
 
 -- State.
 local originalPartProperties = {}
+local originalDecalTransparency = {}
 local originalAnimIds = {}
 local auraCache = {}
 local currentAuraObject = nil
@@ -212,6 +213,7 @@ function PlayerVisuals:SaveOriginalProperties()
 	if not char then return end
 
 	table.clear(originalPartProperties)
+	table.clear(originalDecalTransparency)
 	for _, obj in ipairs(char:GetDescendants()) do
 		if obj:IsA("BasePart") then
 			originalPartProperties[obj] = {
@@ -235,25 +237,36 @@ function PlayerVisuals:ApplyMaterial()
 
 	local matEnum = Enum.Material[cfg.SelectedMaterial] or Enum.Material.ForceField
 	local hideR15 = r6ModelClone ~= nil
+	local alpha = cfg.MaterialTransparency
 
-	for _, part in ipairs(char:GetDescendants()) do
-		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-			local orig = originalPartProperties[part]
+	for _, obj in ipairs(char:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
+			local orig = originalPartProperties[obj]
 			if not orig then
 				orig = {
-					Material = part.Material,
-					Color = part.Color,
-					Transparency = part.Transparency
+					Material = obj.Material,
+					Color = obj.Color,
+					Transparency = obj.Transparency
 				}
-				originalPartProperties[part] = orig
+				originalPartProperties[obj] = orig
 			end
 
-			part.Material = matEnum
-			part.Color = cfg.CustomMaterialColor and cfg.MaterialColor or orig.Color
+			obj.Material = matEnum
+			obj.Color = cfg.CustomMaterialColor and cfg.MaterialColor or orig.Color
 
-			if not (hideR15 and R15_BODY_PARTS[part.Name]) then
-				part.Transparency = cfg.MaterialTransparency
+			if not (hideR15 and R15_BODY_PARTS[obj.Name]) then
+				obj.Transparency = alpha
 			end
+		elseif obj:IsA("Decal") or obj:IsA("Texture") then
+			-- Лицо под R6 остаётся скрытым, его трогать нельзя.
+			if hideR15 and obj.Parent and obj.Parent.Name == "Head" then
+				continue
+			end
+
+			if originalDecalTransparency[obj] == nil then
+				originalDecalTransparency[obj] = obj.Transparency
+			end
+			obj.Transparency = alpha
 		end
 	end
 end
@@ -270,6 +283,13 @@ function PlayerVisuals:RestoreOriginalProperties()
 		end
 	end
 	table.clear(originalPartProperties)
+
+	for decal, t in pairs(originalDecalTransparency) do
+		if decal and decal.Parent then
+			decal.Transparency = t
+		end
+	end
+	table.clear(originalDecalTransparency)
 
 	if r6ModelClone then
 		setR15Hidden(char, true)
