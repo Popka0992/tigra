@@ -104,7 +104,7 @@ PlayerVisuals.AnimationPacks = {
 	["Toy"] = {
 		idle = {"782841498", "782845736"},
 		walk = "782843345",
-		run = "782841498",
+		run = "782841498", -- TODO: verify, same id as idle[1]
 		jump = "782847020",
 		fall = "782838421"
 	},
@@ -138,10 +138,31 @@ PlayerVisuals.AnimationPacks = {
 	}
 }
 
+-- R15 body parts hidden while R6 rig is active.
+local R15_BODY_PARTS = {
+	["Head"] = true,
+	["UpperTorso"] = true,
+	["LowerTorso"] = true,
+	["LeftUpperArm"] = true,
+	["LeftLowerArm"] = true,
+	["LeftHand"] = true,
+	["RightUpperArm"] = true,
+	["RightLowerArm"] = true,
+	["RightHand"] = true,
+	["LeftUpperLeg"] = true,
+	["LeftLowerLeg"] = true,
+	["LeftFoot"] = true,
+	["RightUpperLeg"] = true,
+	["RightLowerLeg"] = true,
+	["RightFoot"] = true
+}
+
 -- State.
 local originalPartProperties = {}
+local originalAnimIds = {}
 local auraCache = {}
 local currentAuraObject = nil
+local auraToken = 0
 local currentDanceTrack = nil
 local currentDanceAnim = nil
 local r6ModelClone = nil
@@ -169,6 +190,20 @@ local function getAnimator(humanoid)
 		animator = Instance.new("Animator", humanoid)
 	end
 	return animator
+end
+
+local function setR15Hidden(char, hidden)
+	for _, part in ipairs(char:GetChildren()) do
+		if part:IsA("BasePart") and R15_BODY_PARTS[part.Name] then
+			part.Transparency = hidden and 1 or 0
+		end
+	end
+
+	local head = char:FindFirstChild("Head")
+	local face = head and head:FindFirstChildOfClass("Decal")
+	if face then
+		face.Transparency = hidden and 1 or 0
+	end
 end
 
 -- Material Changer.
@@ -199,22 +234,26 @@ function PlayerVisuals:ApplyMaterial()
 	end
 
 	local matEnum = Enum.Material[cfg.SelectedMaterial] or Enum.Material.ForceField
+	local hideR15 = r6ModelClone ~= nil
 
 	for _, part in ipairs(char:GetDescendants()) do
 		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-			if not originalPartProperties[part] then
-				originalPartProperties[part] = {
+			local orig = originalPartProperties[part]
+			if not orig then
+				orig = {
 					Material = part.Material,
 					Color = part.Color,
 					Transparency = part.Transparency
 				}
+				originalPartProperties[part] = orig
 			end
 
 			part.Material = matEnum
-			if cfg.CustomMaterialColor then
-				part.Color = cfg.MaterialColor
+			part.Color = cfg.CustomMaterialColor and cfg.MaterialColor or orig.Color
+
+			if not (hideR15 and R15_BODY_PARTS[part.Name]) then
+				part.Transparency = cfg.MaterialTransparency
 			end
-			part.Transparency = cfg.MaterialTransparency
 		end
 	end
 end
@@ -231,6 +270,10 @@ function PlayerVisuals:RestoreOriginalProperties()
 		end
 	end
 	table.clear(originalPartProperties)
+
+	if r6ModelClone then
+		setR15Hidden(char, true)
+	end
 end
 
 -- Avatar Cloner.
@@ -447,6 +490,9 @@ end
 function PlayerVisuals:RefreshAuras()
 	self:ClearAuras()
 
+	auraToken = auraToken + 1
+	local myToken = auraToken
+
 	local cfg = self.Config.Aura
 	if not cfg.enabled then return end
 
@@ -459,7 +505,8 @@ function PlayerVisuals:RefreshAuras()
 
 	task.spawn(function()
 		local asset = loadAuraAsset(assetId)
-		if not asset or not char.Parent then return end
+		if myToken ~= auraToken or not char or not char.Parent then return end
+		if not asset then return end
 
 		local auraInstance = asset:Clone()
 		auraInstance.Name = "PlayerVisuals_Aura"
@@ -478,8 +525,11 @@ function PlayerVisuals:RefreshAuras()
 					child:Clone().Parent = attachment
 				end
 			end
+
 			if auraInstance:IsA("ParticleEmitter") then
 				auraInstance.Parent = attachment
+			else
+				auraInstance:Destroy()
 			end
 		end
 
@@ -497,24 +547,6 @@ function PlayerVisuals:RefreshAuras()
 end
 
 -- R6 Rig.
-local R15_BODY_PARTS = {
-	["Head"] = true,
-	["UpperTorso"] = true,
-	["LowerTorso"] = true,
-	["LeftUpperArm"] = true,
-	["LeftLowerArm"] = true,
-	["LeftHand"] = true,
-	["RightUpperArm"] = true,
-	["RightLowerArm"] = true,
-	["RightHand"] = true,
-	["LeftUpperLeg"] = true,
-	["LeftLowerLeg"] = true,
-	["LeftFoot"] = true,
-	["RightUpperLeg"] = true,
-	["RightLowerLeg"] = true,
-	["RightFoot"] = true
-}
-
 local function constructR6Model(char)
 	local r6 = Instance.new("Model")
 	r6.Name = "R6_Visual_Clone"
@@ -598,19 +630,9 @@ function PlayerVisuals:ApplyRig(rigType)
 		r6ModelClone = r6Model
 		r6ModelClone.Parent = char
 
-		-- Hide real R15 body parts.
-		for _, part in ipairs(char:GetChildren()) do
-			if part:IsA("BasePart") and R15_BODY_PARTS[part.Name] then
-				part.Transparency = 1
-			end
-		end
+		setR15Hidden(char, true)
 
 		local realHead = char:FindFirstChild("Head")
-		local realFace = realHead and realHead:FindFirstChildOfClass("Decal")
-		if realFace then
-			realFace.Transparency = 1
-		end
-
 		local upperTorso = char:FindFirstChild("UpperTorso")
 		local leftUpperArm = char:FindFirstChild("LeftUpperArm")
 		local rightUpperArm = char:FindFirstChild("RightUpperArm")
@@ -667,25 +689,41 @@ function PlayerVisuals:ResetRig()
 
 	local char = getCharacter()
 	if char then
-		for _, part in ipairs(char:GetChildren()) do
-			if part:IsA("BasePart") and R15_BODY_PARTS[part.Name] then
-				part.Transparency = 0
-			end
-		end
-
-		local realHead = char:FindFirstChild("Head")
-		local realFace = realHead and realHead:FindFirstChildOfClass("Decal")
-		if realFace then
-			realFace.Transparency = 0
-		end
+		setR15Hidden(char, false)
 	end
 
 	self:ApplyMaterial()
 end
+
 -- Animation Packs.
+local function setAnimId(anim, id)
+	if not anim or not anim:IsA("Animation") then return end
+	if originalAnimIds[anim] == nil then
+		originalAnimIds[anim] = anim.AnimationId
+	end
+	anim.AnimationId = id
+end
+
+local function childOf(parent, name)
+	return parent and parent:FindFirstChild(name)
+end
+
+function PlayerVisuals:RestoreAnimations()
+	for anim, original in pairs(originalAnimIds) do
+		if anim.Parent then
+			anim.AnimationId = original
+		end
+	end
+	table.clear(originalAnimIds)
+end
+
 function PlayerVisuals:ApplyAnimationPack(packName)
 	self.Config.Rig.AnimationPack = packName
-	if packName == "None" or not packName then return end
+
+	if not packName or packName == "None" then
+		self:RestoreAnimations()
+		return
+	end
 
 	local pack = self.AnimationPacks[packName]
 	if not pack then return end
@@ -695,24 +733,18 @@ function PlayerVisuals:ApplyAnimationPack(packName)
 	if not animate then return end
 
 	pcall(function()
-		if animate:FindFirstChild("idle") then
-			local id1 = animate.idle:FindFirstChild("Animation1")
-			local id2 = animate.idle:FindFirstChild("Animation2")
-			if id1 and pack.idle[1] then id1.AnimationId = "rbxassetid://" .. pack.idle[1] end
-			if id2 and pack.idle[2] then id2.AnimationId = "rbxassetid://" .. pack.idle[2] end
-		end
-		if animate:FindFirstChild("walk") and animate.walk:FindFirstChild("WalkAnim") then
-			animate.walk.WalkAnim.AnimationId = "rbxassetid://" .. pack.walk
-		end
-		if animate:FindFirstChild("run") and animate.run:FindFirstChild("RunAnim") then
-			animate.run.RunAnim.AnimationId = "rbxassetid://" .. pack.run
-		end
-		if animate:FindFirstChild("jump") and animate.jump:FindFirstChild("JumpAnim") then
-			animate.jump.JumpAnim.AnimationId = "rbxassetid://" .. pack.jump
-		end
-		if animate:FindFirstChild("fall") and animate.fall:FindFirstChild("FallAnim") then
-			animate.fall.FallAnim.AnimationId = "rbxassetid://" .. pack.fall
-		end
+		local idle = animate:FindFirstChild("idle")
+		local walk = animate:FindFirstChild("walk")
+		local run = animate:FindFirstChild("run")
+		local jump = animate:FindFirstChild("jump")
+		local fall = animate:FindFirstChild("fall")
+
+		setAnimId(childOf(idle, "Animation1"), "rbxassetid://" .. pack.idle[1])
+		setAnimId(childOf(idle, "Animation2"), "rbxassetid://" .. pack.idle[2])
+		setAnimId(childOf(walk, "WalkAnim"), "rbxassetid://" .. pack.walk)
+		setAnimId(childOf(run, "RunAnim"), "rbxassetid://" .. pack.run)
+		setAnimId(childOf(jump, "JumpAnim"), "rbxassetid://" .. pack.jump)
+		setAnimId(childOf(fall, "FallAnim"), "rbxassetid://" .. pack.fall)
 	end)
 end
 
@@ -762,6 +794,16 @@ function PlayerVisuals:PlayDance(danceName)
 	end
 end
 
+-- Reset everything (rig, animations, dance, aura).
+function PlayerVisuals:ResetAll()
+	self:StopDance()
+	self:ResetRig()
+	self.Config.Rig.RigType = "Default"
+	self:ApplyAnimationPack("None")
+	self.Config.Aura.enabled = false
+	self:RefreshAuras()
+end
+
 -- Lifecycle.
 function PlayerVisuals:GetConfig()
 	return self.Config.Material, self.Config.Aura, self.Config.Avatar, self.Config.Rig, self.Config.Dance
@@ -775,37 +817,52 @@ function PlayerVisuals:GetDanceList()
 	return self.DanceNames
 end
 
+function PlayerVisuals:ApplyAll()
+	table.clear(originalAnimIds)
+	self:SaveOriginalProperties()
+
+	local cfg = self.Config
+
+	if cfg.Material.MaterialChanger then
+		self:ApplyMaterial()
+	end
+
+	if cfg.Aura.enabled then
+		self:RefreshAuras()
+	end
+
+	if cfg.Avatar.Enabled and cfg.Avatar.TargetUserId > 0 then
+		self:ApplyAvatar(cfg.Avatar.TargetUserId)
+	end
+
+	if cfg.Rig.RigType ~= "Default" then
+		self:ApplyRig(cfg.Rig.RigType)
+	end
+
+	if cfg.Rig.AnimationPack ~= "None" then
+		self:ApplyAnimationPack(cfg.Rig.AnimationPack)
+	end
+
+	if cfg.Dance.Playing and cfg.Dance.CurrentDance ~= "None" then
+		self:PlayDance(cfg.Dance.CurrentDance)
+	end
+end
+
 function PlayerVisuals:Load()
 	localPlayer.CharacterAdded:Connect(function()
 		task.wait(0.65)
-		self:SaveOriginalProperties()
-
-		if self.Config.Material.MaterialChanger then
-			self:ApplyMaterial()
-		end
-
-		if self.Config.Aura.enabled then
-			self:RefreshAuras()
-		end
-
-		if self.Config.Avatar.Enabled and self.Config.Avatar.TargetUserId > 0 then
-			self:ApplyAvatar(self.Config.Avatar.TargetUserId)
-		end
-
-		if self.Config.Rig.RigType ~= "Default" then
-			self:ApplyRig(self.Config.Rig.RigType)
-		end
-
-		if self.Config.Rig.AnimationPack ~= "None" then
-			self:ApplyAnimationPack(self.Config.Rig.AnimationPack)
-		end
-
-		if self.Config.Dance.Playing and self.Config.Dance.CurrentDance ~= "None" then
-			self:PlayDance(self.Config.Dance.CurrentDance)
-		end
+		self:ApplyAll()
 	end)
 
-	self:SaveOriginalProperties()
+	if localPlayer.Character then
+		task.spawn(function()
+			task.wait(0.65)
+			self:ApplyAll()
+		end)
+	else
+		self:SaveOriginalProperties()
+	end
+
 	return self
 end
 
