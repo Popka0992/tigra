@@ -85,8 +85,7 @@ circleInline.Filled = false
 circleInline.ZIndex = 2
 circleInline.Visible = false
 
----Scan workspace for potential targets (Players & Bots).
----@return table
+
 local function getTargetEntities()
 	local entities = {}
 	local myChar = localPlayer.Character
