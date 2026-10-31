@@ -224,7 +224,7 @@ for name in pairs(SKYBOX_ASSETS) do
 end
 table.sort(WorldVisuals.SkyboxNames)
 
--- Lighting baselines.
+
 local originalAmbient = lightingService.Ambient
 local originalOutdoorAmbient = lightingService.OutdoorAmbient
 local originalFogColor = lightingService.FogColor
