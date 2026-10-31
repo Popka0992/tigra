@@ -1,21 +1,19 @@
 
--- Check for table that is shared between executions.
 if not shared then
 	return warn("No shared, no script.")
 end
 
--- Initialize Luraph globals if they do not exist.
 loadstring("getfenv().LPH_NO_VIRTUALIZE = function(...) return ... end")()
 getfenv().PP_SCRAMBLE_NUM = function(...) return ... end
 getfenv().PP_SCRAMBLE_STR = function(...) return ... end
 getfenv().PP_SCRAMBLE_RE_NUM = function(...) return ... end
 
--- Unload previous instance.
+
 if shared.Arbuzi and shared.Arbuzi.Unload then
 	pcall(shared.Arbuzi.Unload, shared.Arbuzi)
 end
 
--- Services.
+
 local cloneref = cloneref or function(instance) return instance end
 local workspaceService = cloneref(game:GetService("Workspace"))
 local playersService = cloneref(game:GetService("Players"))
@@ -49,12 +47,11 @@ local cameraPosition = newVector3(0, 0, 0)
 local cachedFocalLength = 0
 local viewPortY = 0
 
--- Weapon Database for fingerprinting & Icons.
+
 local weaponMeshMap = {}
 local toolSignatures = {}
 local weaponIcons = {}
 
----Scan UI or tools if present in game without hanging threads.
 local function indexUniversalTools()
 	pcall(function()
 		local prefabs = workspaceService:FindFirstChild("Prefabs", true) or replicatedStorage:FindFirstChild("Prefabs", true) or workspaceService:FindFirstChild("Tools", true)
@@ -77,9 +74,7 @@ local function indexUniversalTools()
 end
 task.spawn(indexUniversalTools)
 
----Universal weapon resolution with fallback to classic Tools.
----@param character Model
----@return string
+
 local function resolveEquippedWeapon(character)
 	local tool = character:FindFirstChildOfClass("Tool")
 	if tool then
@@ -137,7 +132,6 @@ local function resolveEquippedWeapon(character)
 	return "Worldmodel"
 end
 
----Refresh cached camera-dependent math.
 local function updateCameraCache()
 	camera = workspaceService.CurrentCamera
 	if not camera then return end
@@ -230,7 +224,6 @@ local Arbuzi = {
 Arbuzi.__index = Arbuzi
 local config = Arbuzi.Table
 
--- Font Registration.
 local Fonts = {}
 do
 	local function fetchSource(url)
@@ -917,8 +910,6 @@ function Arbuzi:AddTarget(target)
 	end)
 end
 
----Remove target from ESP cache.
----@param target Model
 function Arbuzi:RemoveTarget(target)
 	local data = self.Cache[target]
 	if not data then return end
@@ -1192,7 +1183,6 @@ function Arbuzi:Load()
 		IgnoreGuiInset = true
 	})
 
-	-- Universal Players Connection.
 	local function bindPlayer(player)
 		if player == localPlayer then return end
 		if player.Character then
@@ -1214,7 +1204,6 @@ function Arbuzi:Load()
 		end
 	end)
 
-	-- Fallback for Bot/NPC Models in Workspace.
 	if config.Bots and config.Bots.Enabled then
 		self.Threads["WorkspaceNPCs"] = workspaceService.ChildAdded:Connect(function(child)
 			if child:IsA("Model") and not playersService:GetPlayerFromCharacter(child) then
