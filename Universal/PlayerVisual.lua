@@ -5,11 +5,11 @@ local runService = game:GetService("RunService")
 -- Variables.
 local localPlayer = playersService.LocalPlayer
 
----@module Features.Visuals.PlayerVisuals
+
 local PlayerVisuals = {}
 PlayerVisuals.__index = PlayerVisuals
 
--- Constants.
+
 local PARTICLE_AURA_DATA = {
 	{ "starlight", "rbxassetid://134645216613107" },
 	{ "heavenly", "rbxassetid://139300897520961" },
@@ -104,7 +104,7 @@ PlayerVisuals.AnimationPacks = {
 	["Toy"] = {
 		idle = {"782841498", "782845736"},
 		walk = "782843345",
-		run = "782841498", -- TODO: verify, same id as idle[1]
+		run = "782841498", 
 		jump = "782847020",
 		fall = "782838421"
 	},
@@ -138,7 +138,7 @@ PlayerVisuals.AnimationPacks = {
 	}
 }
 
--- R15 body parts hidden while R6 rig is active.
+
 local R15_BODY_PARTS = {
 	["Head"] = true,
 	["UpperTorso"] = true,
@@ -157,7 +157,7 @@ local R15_BODY_PARTS = {
 	["RightFoot"] = true
 }
 
--- State.
+
 local originalPartProperties = {}
 local originalDecalTransparency = {}
 local originalAnimIds = {}
@@ -169,7 +169,7 @@ local currentDanceAnim = nil
 local r6ModelClone = nil
 local r6HeartbeatConnection = nil
 
--- Helpers.
+
 local function getCharacter()
 	return localPlayer and localPlayer.Character
 end
@@ -207,7 +207,7 @@ local function setR15Hidden(char, hidden)
 	end
 end
 
--- Material Changer.
+
 function PlayerVisuals:SaveOriginalProperties()
 	local char = getCharacter()
 	if not char then return end
@@ -258,7 +258,7 @@ function PlayerVisuals:ApplyMaterial()
 				obj.Transparency = alpha
 			end
 		elseif obj:IsA("Decal") or obj:IsA("Texture") then
-			-- Лицо под R6 остаётся скрытым, его трогать нельзя.
+
 			if hideR15 and obj.Parent and obj.Parent.Name == "Head" then
 				continue
 			end
@@ -296,7 +296,7 @@ function PlayerVisuals:RestoreOriginalProperties()
 	end
 end
 
--- Avatar Cloner.
+
 local function weldAccessory(char, acc)
 	local handle = acc:FindFirstChild("Handle")
 	if not handle then return end
@@ -566,7 +566,7 @@ function PlayerVisuals:RefreshAuras()
 	end)
 end
 
--- R6 Rig.
+
 local function constructR6Model(char)
 	local r6 = Instance.new("Model")
 	r6.Name = "R6_Visual_Clone"
@@ -598,7 +598,7 @@ local function constructR6Model(char)
 	headMesh.Scale = Vector3.new(1.25, 1.25, 1.25)
 	headMesh.Parent = createdParts.Head
 
-	-- Copy face.
+
 	local realHead = char:FindFirstChild("Head")
 	local realFace = realHead and realHead:FindFirstChildOfClass("Decal")
 	if realFace then
@@ -606,7 +606,7 @@ local function constructR6Model(char)
 		faceClone.Parent = createdParts.Head
 	end
 
-	-- Copy body colors.
+
 	local bodyColors = char:FindFirstChildOfClass("BodyColors")
 	if bodyColors then
 		createdParts.Head.Color = bodyColors.HeadColor3
@@ -617,7 +617,7 @@ local function constructR6Model(char)
 		createdParts["Right Leg"].Color = bodyColors.RightLegColor3
 	end
 
-	-- Copy clothes.
+
 	for _, item in ipairs(char:GetChildren()) do
 		if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
 			item:Clone().Parent = r6
@@ -715,7 +715,7 @@ function PlayerVisuals:ResetRig()
 	self:ApplyMaterial()
 end
 
--- Animation Packs.
+
 local function setAnimId(anim, id)
 	if not anim or not anim:IsA("Animation") then return end
 	if originalAnimIds[anim] == nil then
@@ -768,7 +768,7 @@ function PlayerVisuals:ApplyAnimationPack(packName)
 	end)
 end
 
--- Dance Emotes.
+
 function PlayerVisuals:StopDance()
 	if currentDanceTrack then
 		currentDanceTrack:Stop(0.15)
@@ -814,7 +814,7 @@ function PlayerVisuals:PlayDance(danceName)
 	end
 end
 
--- Reset everything (rig, animations, dance, aura).
+
 function PlayerVisuals:ResetAll()
 	self:StopDance()
 	self:ResetRig()
@@ -824,7 +824,7 @@ function PlayerVisuals:ResetAll()
 	self:RefreshAuras()
 end
 
--- Lifecycle.
+
 function PlayerVisuals:GetConfig()
 	return self.Config.Material, self.Config.Aura, self.Config.Avatar, self.Config.Rig, self.Config.Dance
 end
